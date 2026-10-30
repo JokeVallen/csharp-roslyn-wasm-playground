@@ -68,9 +68,6 @@ if (Test-Path $bootstrapDir) {
 $headers = @"
 /_framework/*
   Cache-Control: public, max-age=31536000, immutable
-
-/*
-  Cache-Control: public, max-age=0, must-revalidate
 "@
 [System.IO.File]::WriteAllText((Join-Path $OutputDir "_headers"), $headers, [System.Text.UTF8Encoding]::new($false))
 

@@ -56,9 +56,6 @@ fi
 cat > "$OUT_DIR/_headers" <<'EOF'
 /_framework/*
   Cache-Control: public, max-age=31536000, immutable
-
-/*
-  Cache-Control: public, max-age=0, must-revalidate
 EOF
 
 echo "Published multi-runtime site to $OUT_DIR"
