@@ -4,7 +4,7 @@
 
 A browser-based C# playground for writing, compiling, and running C# without a backend. It is built with Blazor WebAssembly, the Roslyn compiler, and .NET WebAssembly, and is designed to be embedded in blogs or documentation through an `<iframe>`.
 
-This repository is an extended fork of [MicrosoftLearning/c-sharp-minor](https://github.com/MicrosoftLearning/c-sharp-minor). The original project was created for the [Get started with C# Programming](https://learn.microsoft.com/training/paths/get-started-c-sharp-part-1) learning path. This fork keeps the browser-only Roslyn compilation model, supports real .NET 8 / .NET 9 / .NET 10 runtime builds, adds a themeable UI, iframe presets, code completion, and a GitHub Pages deployment pipeline.
+This repository is an extended fork of [MicrosoftLearning/c-sharp-minor](https://github.com/MicrosoftLearning/c-sharp-minor). The original project was created for the [Get started with C# Programming](https://learn.microsoft.com/training/paths/get-started-c-sharp-part-1) learning path. This fork keeps the browser-only Roslyn compilation model, supports real .NET 8 / .NET 9 / .NET 10 runtime builds, adds a themeable UI, iframe presets, code completion, and GitHub Pages / Cloudflare Pages deployment pipelines.
 
 > **NOTE**: This is a community fork. It is not an officially supported Microsoft product or service and is provided as-is, without warranty of any kind. The original MIT license and copyright notice are retained in [LICENSE](LICENSE).
 
@@ -23,7 +23,7 @@ This repository is an extended fork of [MicrosoftLearning/c-sharp-minor](https:/
 - **Web Worker execution sandbox**: Roslyn compilation, semantic completion, and user-code execution run off the UI thread; a Stop button terminates runaway programs.
 - **Compact editor settings**: Compile target, automatic completion, and format-after-completion live in a `⚙ 设置` popover.
 - **Bilingual docs**: English and 简体中文 documentation for the runtime, iframe API, deployment, and fork changes.
-- **Static deployment**: Publishes as a self-contained static site for GitHub Pages, Nginx, or any SPA-capable host.
+- **Static deployment**: Publishes as a self-contained static site for GitHub Pages, Cloudflare Pages, Nginx, or any SPA-capable host.
 - **Open source attribution**: Extended from `MicrosoftLearning/c-sharp-minor`; MIT licensed.
 
 
@@ -40,7 +40,7 @@ This repository is an extended fork of [MicrosoftLearning/c-sharp-minor](https:/
 - **Compiler**: Microsoft.CodeAnalysis.CSharp (Roslyn) 4.14.0, running in a dedicated .NET Web Worker so editing stays responsive
 - **Editor**: Native `<textarea>` with keyboard shortcuts and simplified/full-code modes (no Monaco dependency)
 - **Reference assemblies**: Basic.Reference.Assemblies.Net80 / Net90 / Net100 embedded resources for WebAssembly-compatible Roslyn references
-- **Deployment**: GitHub Pages workflow + reusable `scripts/publish.*` helpers
+- **Deployment**: GitHub Pages and Cloudflare Pages workflows + reusable `scripts/publish.*` helpers
 
 ### Key implementation notes
 
@@ -78,7 +78,7 @@ CSharpCompilerWasm/
   wwwroot/js/roslyn-worker.js # main-thread worker client
   wwwroot/css/playground.css  # themeable UI and iframe presets
   wwwroot/index.html          # Blazor host page / base href
-.github/workflows/deploy.yml  # GitHub Pages deployment
+.github/workflows/             # GitHub Pages and Cloudflare Pages deployment
 scripts/publish.*             # self-hosted publish helpers
 deploy/nginx.conf.example     # example Nginx SPA configuration
 ```
@@ -95,6 +95,8 @@ The workflow in `.github/workflows/deploy.yml`:
 2. rewrites each build's `<base href="...">` and assembles the multi-runtime site,
 3. adds `.nojekyll`, and
 4. publishes the assembled `publish/site` through GitHub Pages.
+
+The workflow in `.github/workflows/deploy-cloudflare.yml` builds the same multi-runtime site for Cloudflare Pages, strips precompressed files that Cloudflare regenerates, writes `_headers`, and deploys through Wrangler. Configure `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets; optionally set `CLOUDFLARE_PROJECT_NAME` as a repository variable.
 
 For a self-hosted/dsh deployment under a different path, use the helper scripts:
 

@@ -4,7 +4,7 @@
 
 一个完全运行在浏览器中的 C# 在线游乐场：编写代码、调用 Roslyn 编译，并在 .NET WebAssembly 中直接执行，无需后端服务器。项目支持通过 `<iframe>` 嵌入博客或文档，并可通过 URL 参数切换多套视觉风格。
 
-本仓库是 [MicrosoftLearning/c-sharp-minor](https://github.com/MicrosoftLearning/c-sharp-minor) 的扩展分支。原项目用于支持 Microsoft Learn 的 [Get started with C# Programming](https://learn.microsoft.com/training/paths/get-started-c-sharp-part-1) 学习路径；本分支在保留“浏览器内编译”架构的基础上，支持真实的 .NET 8 / .NET 9 / .NET 10 运行时构建，并加入可主题化界面、iframe 预设、代码提示和 GitHub Pages 部署流程。
+本仓库是 [MicrosoftLearning/c-sharp-minor](https://github.com/MicrosoftLearning/c-sharp-minor) 的扩展分支。原项目用于支持 Microsoft Learn 的 [Get started with C# Programming](https://learn.microsoft.com/training/paths/get-started-c-sharp-part-1) 学习路径；本分支在保留“浏览器内编译”架构的基础上，支持真实的 .NET 8 / .NET 9 / .NET 10 运行时构建，并加入可主题化界面、iframe 预设、代码提示和 GitHub Pages / Cloudflare Pages 部署流程。
 
 > **说明**：本项目是社区分支，并非 Microsoft 官方支持的产品或服务。项目按“原样”提供，不附带任何形式的担保。原始 MIT 许可证及版权声明保留在 [LICENSE](LICENSE) 中。
 
@@ -23,7 +23,7 @@
 - **Web Worker 执行沙盒**：Roslyn 编译、语义补全和用户代码执行均运行在 UI 线程之外；Stop 按钮可终止失控程序。
 - **紧凑的编辑器设置**：编译目标、自动补全和接纳补全后格式化集中在 `⚙ 设置` 弹层中。
 - **中英双语文档**：运行时、iframe API、部署和分支差异均有英文与简体中文版本。
-- **纯静态部署**：构建产物可部署到 GitHub Pages、Nginx 或任何支持 SPA fallback 的静态托管环境。
+- **纯静态部署**：构建产物可部署到 GitHub Pages、Cloudflare Pages、Nginx 或任何支持 SPA fallback 的静态托管环境。
 - **开源归属清晰**：基于 `MicrosoftLearning/c-sharp-minor` 扩展，采用 MIT 许可证。
 
 ## 🏗️ 技术架构
@@ -35,7 +35,7 @@
 - **编译器**：Microsoft.CodeAnalysis.CSharp (Roslyn) 4.14.0，运行在独立的 .NET Web Worker 中，编辑时不再阻塞主线程
 - **编辑器**：原生 `<textarea>`，支持快捷键及简化/完整代码视图（不依赖 Monaco）
 - **引用程序集**：Basic.Reference.Assemblies.Net80 / Net90 / Net100 的内嵌资源，提供 WebAssembly 兼容的 Roslyn 引用
-- **部署**：GitHub Pages 工作流 + 可复用的 `scripts/publish.*` 脚本
+- **部署**：GitHub Pages 与 Cloudflare Pages 工作流 + 可复用的 `scripts/publish.*` 脚本
 
 ### 关键实现说明
 
@@ -73,7 +73,7 @@ CSharpCompilerWasm/
   wwwroot/js/roslyn-worker.js # 主线程 Worker 客户端
   wwwroot/css/playground.css  # 可主题化 UI 与 iframe 预设
   wwwroot/index.html          # Blazor 宿主页 / base href
-.github/workflows/deploy.yml  # GitHub Pages 部署
+.github/workflows/             # GitHub Pages 与 Cloudflare Pages 部署
 scripts/publish.*             # 自托管发布脚本
 deploy/nginx.conf.example     # Nginx SPA 配置示例
 ```
@@ -90,6 +90,8 @@ deploy/nginx.conf.example     # Nginx SPA 配置示例
 2. 重写每个构建的 `<base href="...">` 并组装多运行时站点；
 3. 生成 `.nojekyll`；
 4. 将组装后的 `publish/site` 发布到 GitHub Pages。
+
+`.github/workflows/deploy-cloudflare.yml` 会构建同一套多运行时站点，删除 Cloudflare 会自动重新压缩的文件，写入 `_headers`，并通过 Wrangler 部署到 Cloudflare Pages。需要在仓库 Secrets 中配置 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`；项目名不同时可通过仓库变量 `CLOUDFLARE_PROJECT_NAME` 指定。
 
 如果部署到 dsh 或其他自托管环境的子路径，可使用辅助脚本：
 
