@@ -1,0 +1,126 @@
+# Static deployment guide
+
+[简体中文](deployment.zh-CN.md) | **English**
+
+The playground is a Blazor WebAssembly SPA. Deployment means publishing static files and serving them with the correct base path, MIME types, and SPA fallback.
+
+For the real .NET 8 / .NET 9 / .NET 10 multi-runtime layout, see [Runtime versions](runtimes.md).
+
+## Requirements
+
+- .NET 9 SDK
+- A static host or web server such as GitHub Pages, Nginx, IIS, or a CDN with SPA rewrites
+
+## Local development
+
+```bash
+dotnet restore
+dotnet run --project CSharpCompilerWasm/CSharpCompilerWasm.csproj
+```
+
+The HTTP launch profile defaults to `http://localhost:5158`.
+
+## Publish
+
+```bash
+dotnet publish CSharpCompilerWasm/CSharpCompilerWasm.csproj -c Release -f net10.0 -o ./publish
+```
+
+Publish output:
+
+```text
+publish/wwwroot/
+```
+
+## Base href rule
+
+`wwwroot/index.html` contains:
+
+```html
+<base href="/" />
+```
+
+The final `<base href>` must match the URL path where the app is served and must end with `/`.
+
+| Deployment URL | Base href |
+| --- | --- |
+| `https://example.com/` | `/` |
+| `https://example.com/csharp-playground/` | `/csharp-playground/` |
+| `https://jokevallen.github.io/csharp-roslyn-wasm-playground/` | `/csharp-roslyn-wasm-playground/` |
+
+The helper scripts rewrite the base href for you:
+
+```bash
+./scripts/publish.sh /csharp-playground/ ./publish
+# Windows:
+./scripts/publish.ps1 -BaseHref /csharp-playground/ -OutputDir ./publish
+```
+
+## GitHub Pages
+
+The workflow at `.github/workflows/deploy.yml` runs on pushes to `main` and:
+
+1. publishes the app with `dotnet publish`;
+2. rewrites `<base href>` to `/csharp-roslyn-wasm-playground/`;
+3. creates an empty `.nojekyll`;
+4. uploads `publish/wwwroot` to GitHub Pages.
+
+` .nojekyll` is required because GitHub Pages otherwise ignores directories beginning with `_`, including `_framework`.
+
+## Nginx
+
+Use [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) as a starting point. The critical parts are:
+
+```nginx
+types {
+    application/octet-stream dll;
+    application/wasm wasm;
+    application/octet-stream dat;
+    application/json json;
+}
+
+location /csharp-playground/ {
+    try_files $uri $uri/ /csharp-playground/index.html;
+}
+```
+
+- `try_files` provides SPA fallback so refreshing `/compiler` does not 404.
+- `.dll`, `.wasm`, `.dat`, and `.json` need correct MIME types.
+- Do not add `X-Frame-Options: SAMEORIGIN` or `DENY`; the app is meant to be embedded in an external blog.
+- If using CSP, allow the blog origin with `frame-ancestors`.
+
+## IIS
+
+`docs/web.config` contains an IIS rewrite example. If you deploy a freshly published build, adapt the same rules:
+
+- serve subdirectory content;
+- rewrite missing files to `index.html`;
+- remove `X-Frame-Options`;
+- map `.dll`, `.wasm`, `.dat`, and `.json`.
+
+## Caching
+
+Recommended:
+
+- `index.html` and `blazor.boot.json`: no-cache or short cache;
+- fingerprinted `_framework/*` and compressed `.br`/`.gz` files: long-lived immutable cache.
+
+## Verification checklist
+
+1. `index.html` loads and its `<base href>` matches the deployment path.
+2. `_framework/blazor.boot.json` returns 200.
+3. `_framework/*.dll` and/or `.wasm` assets return 200 with acceptable MIME types.
+4. Refreshing a routed URL such as `/compiler` still loads the app.
+5. `Console.WriteLine("Hello");` compiles and prints `Hello`.
+6. The page can be embedded in the target blog iframe.
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+| --- | --- |
+| Blank page after deploy | Wrong `<base href>` or missing `_framework` assets |
+| 404 on refresh | SPA fallback missing |
+| `_framework` 404 on GitHub Pages | Missing `.nojekyll` |
+| iframe blocked | `X-Frame-Options` or CSP `frame-ancestors` |
+| WASM/MIME error | Server returns the wrong `Content-Type` for `.wasm` |
+| App works locally but not under a sub-path | Base href does not match the sub-path |

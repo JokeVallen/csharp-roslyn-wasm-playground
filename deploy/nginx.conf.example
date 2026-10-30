@@ -1,0 +1,48 @@
+# Example Nginx site for deploying the published Blazor WASM app under
+# https://your-dsh-domain/csharp-playground/
+#
+# Publish first, e.g.:
+#   ./scripts/publish-all.sh /csharp-playground/ ./publish/site
+# then copy publish/site to /var/www/csharp-playground and adjust paths.
+
+server {
+    listen 80;
+    server_name your-dsh-domain;
+
+    root /var/www/csharp-playground;
+    index index.html;
+
+    # Correct MIME types needed by the .NET WASM runtime and Roslyn.
+    types {
+        application/octet-stream dll;
+        application/wasm wasm;
+        application/octet-stream dat;
+        application/json json;
+    }
+    # Each runtime build needs its own SPA fallback and base href.
+    location /csharp-playground/net8/ {
+        try_files $uri $uri/ /csharp-playground/net8/index.html;
+    }
+
+    location /csharp-playground/net9/ {
+        try_files $uri $uri/ /csharp-playground/net9/index.html;
+    }
+
+    location /csharp-playground/net10/ {
+        try_files $uri $uri/ /csharp-playground/net10/index.html;
+    }
+
+
+    # Blazor SPA fallback: unknown paths must return index.html, not 404.
+    location /csharp-playground/ {
+        try_files $uri $uri/ /csharp-playground/index.html;
+    }
+
+    location = /csharp-playground {
+        return 301 /csharp-playground/;
+    }
+
+    # Do not add X-Frame-Options here: the app is meant to be embedded in an
+    # external blog via <iframe>. If you use CSP, allow the blog origin instead:
+    # add_header Content-Security-Policy "frame-ancestors https://your-blog-domain;";
+}

@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CSharpCompilerWasm</title>
+    <title>C# Playground</title>
     <base href="/" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/playground.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="CSharpCompilerWasm.styles.css" rel="stylesheet" />
 </head>
@@ -26,6 +27,28 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+    <script>
+        (function () {
+            const requested = new URLSearchParams(window.location.search).get("runtime");
+            if (!requested) return;
+
+            const target = {
+                "net8": "net8/", "net8.0": "net8/",
+                "net9": "net9/", "net9.0": "net9/",
+                "net10": "net10/", "net10.0": "net10/"
+            }[requested.toLowerCase()];
+
+            if (!target) return;
+
+            const path = window.location.pathname;
+            if (path.endsWith("/" + target)) return;
+
+            const base = path.replace(/net(8|9|10)\/$/, "");
+            window.location.replace(base + target + window.location.search);
+        })();
+    </script>
+    <script src="js/fetch-retry.js"></script>
+    <script src="js/roslyn-worker.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
 

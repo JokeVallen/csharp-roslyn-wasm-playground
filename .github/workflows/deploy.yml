@@ -22,24 +22,51 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
 
-      - name: Publish app
-        run: dotnet publish ./CSharpCompilerWasm/CSharpCompilerWasm.csproj -c Release -o publish
+      - name: Publish runtime builds
+        run: |
+          set -euo pipefail
+          rm -rf publish/site
+          mkdir -p publish/site
 
-      - name: Rewrite base href
-        uses: SteveSandersonMS/ghaction-rewrite-base-href@v1.1.0
+          build_runtime() {
+            tfm="$1"
+            dir="$2"
+            base="$3"
+            dotnet publish ./CSharpCompilerWasm/CSharpCompilerWasm.csproj -c Release -f "$tfm" -o "publish/$dir"
+            sed -i "s|<base href=\"/\" />|<base href=\"$base\" />|" "publish/$dir/wwwroot/index.html"
+            mkdir -p "publish/site/$dir"
+            cp -r "publish/$dir/wwwroot/." "publish/site/$dir/"
+          }
+
+          build_runtime net8.0 net8 "/csharp-roslyn-wasm-playground/net8/"
+          build_runtime net9.0 net9 "/csharp-roslyn-wasm-playground/net9/"
+          build_runtime net10.0 net10 "/csharp-roslyn-wasm-playground/net10/"
+
+          # Default entry is .NET 10 at the site root.
+          cp -r publish/net10/wwwroot/. publish/site/
+          sed -i 's|<base href="/csharp-roslyn-wasm-playground/net10/" />|<base href="/csharp-roslyn-wasm-playground/" />|' publish/site/index.html
+          touch publish/site/.nojekyll
+
+
+
+      - uses: actions/checkout@v4
         with:
-          base_href: /csharp-roslyn-wasm-playground/
-          html_path: publish/wwwroot/index.html
+          fetch-depth: 1
 
-      - name: Ensure .nojekyll
-        run: touch publish/wwwroot/.nojekyll
+
+
+
+
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: publish/wwwroot
+          path: publish/site
 
       - name: Deploy to GitHub Pages
         id: deployment

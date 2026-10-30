@@ -7,10 +7,12 @@
 @using System.Reflection
 @using System.Text
 @using Microsoft.JSInterop
+@using System.Text.Json
 @using Microsoft.AspNetCore.Components.Web
 @inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
 
-<PageTitle>C# minor</PageTitle>
+<PageTitle>C# Playground</PageTitle>
 
 <script>
     window.scrollToBottom = (elementId) => {
@@ -22,6 +24,302 @@
 
 
 
+    window.playgroundCompletion = (() => {
+        const words = [
+            "Console", "WriteLine", "Write", "ReadLine", "System", "Math",
+            "using", "public", "private", "protected", "internal", "static",
+            "class", "struct", "record", "interface", "enum", "namespace",
+            "void", "int", "long", "double", "float", "decimal", "bool",
+            "char", "string", "object", "var", "new", "return", "if", "else",
+            "for", "foreach", "while", "do", "switch", "case", "break",
+            "continue", "try", "catch", "finally", "throw", "true", "false",
+            "null", "List", "Dictionary", "StringBuilder", "TryParse", "Round",
+            "ToString", "Length", "Count", "Add", "Contains"
+        ];
+        const members = [
+            "WriteLine", "Write", "ReadLine", "ToString", "Length", "Count",
+            "Add", "Contains", "TryParse", "Round", "Substring", "ToUpper",
+            "ToLower", "Trim", "Split", "Replace", "StartsWith", "EndsWith"
+        ];
+
+        let textarea = null;
+        let menu = null;
+        let matches = [];
+        let active = -1;
+        let suppressUntil = 0;
+        let localTimer = null;
+        let acceptedByUser = false;
+
+        function updateLocal() {
+            if (Date.now() < suppressUntil) {
+                hide();
+                return;
+            }
+
+            const before = textarea ? textarea.value.slice(0, textarea.selectionStart) : "";
+            if (/\.\s*$/.test(before)) {
+                matches = members.slice(0, 8);
+                active = 0;
+                render();
+                return;
+            }
+
+            const value = prefix();
+            if (value.length < 1) {
+                hide();
+                return;
+            }
+
+            matches = words
+                .filter(word => word.toLowerCase().startsWith(value.toLowerCase()))
+                .slice(0, 8);
+            active = matches.length > 0 ? 0 : -1;
+            render();
+        }
+
+        function hide() {
+            if (menu) {
+                menu.classList.remove("is-visible");
+                menu.innerHTML = "";
+            }
+            active = -1;
+        }
+
+        function prefix() {
+            if (!textarea) return "";
+            const before = textarea.value.slice(0, textarea.selectionStart);
+            const match = before.match(/[\p{L}_][\p{L}\p{N}_]*$/u);
+            return match ? match[0] : "";
+        }
+
+        function applyMenuTheme() {
+            const shell = document.querySelector(".compiler-container.app-shell");
+            if (!shell || !menu) return;
+
+            const styles = getComputedStyle(shell);
+            menu.style.setProperty("--completion-bg", styles.getPropertyValue("--surface").trim());
+            menu.style.setProperty("--completion-text", styles.getPropertyValue("--text").trim());
+            menu.style.setProperty("--completion-border", styles.getPropertyValue("--border").trim());
+            menu.style.setProperty("--completion-active-bg", "rgba(" + styles.getPropertyValue("--accent-rgb").trim() + ", .20)");
+            menu.style.setProperty("--completion-active-text", styles.getPropertyValue("--accent").trim());
+            menu.style.setProperty("--completion-shadow", styles.getPropertyValue("--shadow").trim());
+        }
+
+        function positionMenu() {
+            if (!textarea || !menu) return;
+            applyMenuTheme();
+            const rect = textarea.getBoundingClientRect();
+            const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 20;
+            const line = textarea.value.slice(0, textarea.selectionStart).split("\n").length - 1;
+            const top = Math.min(
+                rect.top + 14 + (line + 1) * lineHeight - textarea.scrollTop,
+                rect.bottom - 110
+            );
+            menu.style.left = (rect.left + 14) + "px";
+            menu.style.top = Math.max(rect.top + 8, top) + "px";
+            menu.style.width = Math.min(rect.width - 28, 360) + "px";
+        }
+
+        function ensureActiveVisible() {
+            const item = menu.querySelector(".code-completion-item.active");
+            if (!item) return;
+
+            const menuRect = menu.getBoundingClientRect();
+            const itemRect = item.getBoundingClientRect();
+            if (itemRect.top < menuRect.top) {
+                menu.scrollTop -= menuRect.top - itemRect.top;
+            } else if (itemRect.bottom > menuRect.bottom) {
+                menu.scrollTop += itemRect.bottom - menuRect.bottom;
+            }
+        }
+
+        function render() {
+            menu.innerHTML = "";
+            matches.forEach((word, index) => {
+                const item = document.createElement("div");
+                item.className = "code-completion-item" + (index === active ? " active" : "");
+                item.dataset.index = index;
+                item.textContent = word;
+                menu.appendChild(item);
+            });
+            positionMenu();
+            menu.classList.toggle("is-visible", matches.length > 0);
+            ensureActiveVisible();
+        }
+
+        function update() {
+            const value = prefix();
+            if (value.length < 1) {
+                hide();
+                return;
+            }
+
+            matches = words
+                .filter(word => word.toLowerCase().startsWith(value.toLowerCase()))
+                .slice(0, 8);
+            active = matches.length > 0 ? 0 : -1;
+            render();
+        }
+
+        function insertIndent(outdent) {
+            if (!textarea) return;
+
+            const value = textarea.value;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+
+            if (start === end && !outdent) {
+                textarea.setRangeText("    ", start, end, "end");
+                textarea.dispatchEvent(new Event("input", { bubbles: true }));
+                textarea.focus();
+                return;
+            }
+
+            const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+            let lineEnd = value.indexOf("\n", end);
+            if (lineEnd < 0) lineEnd = value.length;
+
+            const block = value.slice(lineStart, lineEnd);
+            const lines = block.split("\n").map((line) => {
+                if (outdent) {
+                    return line.replace(/^ {1,4}/, "");
+                }
+                return "    " + line;
+            });
+            const replacement = lines.join("\n");
+            textarea.setRangeText(replacement, lineStart, lineEnd, "end");
+            textarea.setSelectionRange(lineStart, lineStart + replacement.length);
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            textarea.focus();
+        }
+
+        function apply(index) {
+            if (!textarea || index < 0 || index >= matches.length) return;
+
+            const value = prefix();
+            const start = textarea.selectionStart - value.length;
+            textarea.value = textarea.value.slice(0, start) + matches[index] + textarea.value.slice(textarea.selectionStart);
+            const position = start + matches[index].length;
+            textarea.setSelectionRange(position, position);
+            acceptedByUser = true;
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            textarea.focus();
+            suppressUntil = Date.now() + 600;
+            hide();
+        }
+
+        function attach(textareaId, menuId) {
+            if (textarea) return;
+            textarea = document.getElementById(textareaId);
+            if (!textarea) return;
+
+            // Keep the menu outside Blazor's render tree so component updates
+            // cannot reset its visibility while the user is choosing an item.
+            menu = document.createElement("div");
+            menu.id = menuId;
+            menu.className = "code-completion";
+            menu.setAttribute("role", "listbox");
+            menu.setAttribute("aria-label", "代码提示");
+            document.body.appendChild(menu);
+
+            textarea.addEventListener("input", () => {
+                hide();
+                clearTimeout(localTimer);
+                localTimer = setTimeout(updateLocal, 120);
+            });
+            document.addEventListener("mousedown", (event) => {
+                if (event.target !== textarea && !menu.contains(event.target)) {
+                    hide();
+                }
+            });
+            textarea.addEventListener("keydown", (event) => {
+                if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                    event.preventDefault();
+                    if (menu.classList.contains("is-visible") && active >= 0) {
+                        apply(active);
+                    }
+                    else {
+                        insertIndent(event.shiftKey);
+                    }
+                    return;
+                }
+
+                if (event.ctrlKey || event.metaKey || event.altKey) return;
+                if (!menu.classList.contains("is-visible")) return;
+
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                    event.preventDefault();
+                    const delta = event.key === "ArrowDown" ? 1 : -1;
+                    active = (active + delta + matches.length) % matches.length;
+                    render();
+                } else if (event.key === "Enter") {
+                    if (active >= 0) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        apply(active);
+                    }
+                } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    hide();
+                }
+            });
+
+            menu.addEventListener("mousedown", (event) => {
+                const item = event.target.closest("[data-index]");
+                if (!item) return;
+                event.preventDefault();
+                apply(Number(item.dataset.index));
+            });
+        }
+
+        function localKeywordSuggestions() {
+            const value = prefix();
+            if (!value) return [];
+            return words
+                .filter(word => word.toLowerCase().startsWith(value.toLowerCase()))
+                .slice(0, 8);
+        }
+
+        function show(items) {
+            if (Date.now() < suppressUntil) return;
+            if (arguments.length > 1) {
+                items = Array.from(arguments);
+            }
+            else if (typeof items === "string") {
+                items = [items];
+            }
+            const semantic = Array.isArray(items) ? items.slice(0, 12) : [];
+            // Never let an empty/unexpected semantic response erase the local
+            // keyword menu that is already visible.
+            if (semantic.length === 0) {
+                return;
+            }
+
+            const before = textarea ? textarea.value.slice(0, textarea.selectionStart) : "";
+            const memberContext = /\.\s*$/.test(before);
+            const merged = memberContext
+                ? semantic
+                : [...localKeywordSuggestions(), ...semantic];
+
+            matches = Array.from(new Set(merged)).slice(0, 12);
+            active = 0;
+            render();
+        }
+
+        function getSelectionStart(elementId) {
+            const element = document.getElementById(elementId);
+            return element ? element.selectionStart : 0;
+        }
+
+        function consumeAccepted() {
+            const value = acceptedByUser;
+            acceptedByUser = false;
+            return value;
+        }
+
+        return { attach, show, hide, getSelectionStart, consumeAccepted };
+    })();
+
     window.promptForInput = async (newOutputText) => {
         return new Promise((resolve) => {
             const outputElement = document.getElementById('output');
@@ -32,32 +330,33 @@
                 // Create a container for the input line
                 const inputContainer = document.createElement('div');
                 inputContainer.className = 'interactive-output';
-                inputContainer.style.display = 'flex';
-                inputContainer.style.alignItems = 'center';
-                inputContainer.style.width = '100%';
+
+
+
                 
                 // Add the ">" indicator
                 const promptIndicator = document.createElement('span');
                 promptIndicator.textContent = '>';
-                promptIndicator.style.color = '#f0f6fc';
-                promptIndicator.style.marginRight = '5px';
-                promptIndicator.style.fontFamily = "'Consolas', 'Monaco', 'Courier New', monospace";
-                promptIndicator.style.fontSize = '13px';
-                promptIndicator.style.fontWeight = 'bold';
+                promptIndicator.className = 'console-prompt';
+
+
+
+
                 inputContainer.appendChild(promptIndicator);
                 
                 // Create input field
                 const inputField = document.createElement('input');
                 inputField.type = 'text';
-                inputField.style.backgroundColor = '#0d1117';
-                inputField.style.color = '#f0f6fc';
-                inputField.style.border = 'none';
-                inputField.style.padding = '0';
-                inputField.style.fontFamily = "'Consolas', 'Monaco', 'Courier New', monospace";
-                inputField.style.fontSize = '13px';
-                inputField.style.outline = 'none';
-                inputField.style.width = '100%';
-                inputField.style.flex = '1';
+                inputField.className = 'console-input';
+
+
+
+
+
+
+
+
+
                 
                 // Handle input submission
                 inputField.addEventListener('keydown', (e) => {
@@ -119,12 +418,32 @@
 <!-- Skip link for keyboard navigation -->
 <a href="#code-editor" class="skip-link">Skip to code editor</a>
 
-<div class="compiler-container" role="application" aria-label="C# Code Editor Application">
+<div class="compiler-container app-shell @ThemeClass @LayoutClass @ChromeClass @DensityClass" style="@ContainerStyle" role="application" aria-label="C# Code Editor Application">
     <!-- Header with title -->
-    <header class="header" role="banner">
+    <header class="header" role="banner" data-runtime="@RuntimeBadge">
         <div class="header-content">
-            <h1 id="main-title">C# minor</h1>
-            <p class="subheading" aria-describedby="main-title">A C# code editor for educational use</p>
+            <h1 id="main-title">C# Playground</h1>
+            <p class="subheading" aria-describedby="main-title">在浏览器里编写、编译并运行 C#</p>
+        </div>
+        <div class="header-actions" role="toolbar" aria-label="外观设置">
+            <label class="target-picker" title="切换主题">
+                <span class="target-picker-label">主题</span>
+                <select value="@theme" @onchange="OnThemeChanged" aria-label="界面主题">
+                    @foreach (var option in ThemeOptions)
+                    {
+                        <option value="@option">@GetThemeLabel(option)</option>
+                    }
+                </select>
+            </label>
+            <label class="target-picker" title="切换强调色">
+                <span class="target-picker-label">颜色</span>
+                <select value="@accentName" @onchange="OnAccentChanged" aria-label="强调色">
+                    @foreach (var option in AccentOptions)
+                    {
+                        <option value="@option">@option</option>
+                    }
+                </select>
+            </label>
         </div>
     </header>
 
@@ -133,6 +452,42 @@
         <div class="section-header">
             <h3 id="editor-heading">📝 C# Code Editor</h3>
             <div class="editor-controls" role="toolbar" aria-label="Editor controls">
+                <details class="editor-settings">
+                    <summary class="btn btn-outline-secondary btn-sm" title="编辑器设置">⚙ 设置</summary>
+                    <div class="settings-panel">
+                        <label class="settings-row" title="编译目标框架">
+                            <span>目标框架</span>
+                            <select value="@targetFramework" @onchange="OnTargetFrameworkChanged" aria-label="目标框架">
+                                @foreach (var framework in SupportedTargetFrameworks)
+                                {
+                                    <option value="@framework">@GetTargetFrameworkLabel(framework)</option>
+                                }
+                            </select>
+                        </label>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@AutoSemanticCompletion" @onchange="OnAutoCompletionChanged" />
+                            <span>自动语义补全</span>
+                        </label>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@formatAfterCompletion" @onchange="OnFormatAfterCompletionChanged" />
+                            <span>接纳补全后格式化</span>
+                        </label>
+                    </div>
+                </details>
+                <button class="btn btn-outline-secondary btn-sm @(isSemanticBusy ? "is-busy" : "")"
+                        @onclick="ShowSemanticCompletionsAsync"
+                        title="语义补全 (Ctrl+Space)"
+                        aria-label="请求语义代码补全"
+                        disabled="@isSemanticBusy">
+                    <span aria-hidden="true">✨</span> @(isSemanticBusy ? "分析中…" : "提示")
+                </button>
+                <button class="btn btn-outline-secondary btn-sm"
+                        @onclick="FormatCodeAsync"
+                        title="格式化代码 (Ctrl+Shift+F)"
+                        aria-label="格式化 C# 代码"
+                        disabled="@isFormatting">
+                    <span aria-hidden="true">🧹</span> @(isFormatting ? "格式化中…" : "格式化")
+                </button>
                 <button class="btn btn-outline-secondary btn-sm" 
                         @onclick="LoadSampleCode" 
                         @onkeydown="@(async (e) => await HandleKeyDown(e, LoadSampleCode))"
@@ -171,10 +526,13 @@
             </div>
         </div>
         <div class="editor-container">
+
             <label for="code-editor" class="sr-only">C# Code Editor</label>
             <textarea id="code-editor"
                       @bind="displayCode" 
-                      @bind:event="oninput" 
+                      @bind:event="oninput"
+                       @bind:after="OnCodeInputAsync"
+                        
                       @onkeydown="HandleEditorKeyDown"
                       class="code-editor" 
                       placeholder="Write your C# code here..."
@@ -193,7 +551,7 @@
     <!-- Compile Button Section -->
     <section class="compile-section" role="region" aria-labelledby="compile-heading">
         <h3 id="compile-heading" class="sr-only">Compile and Run</h3>
-        <button class="btn btn-primary compile-btn" 
+        <button class="btn btn-primary compile-btn @(isCompiling ? "is-waiting" : "")" 
                 @onclick="CompileAndRun" 
                 @onkeydown="@(async (e) => await HandleKeyDown(e, CompileAndRun))"
                 disabled="@isCompiling" 
@@ -203,11 +561,15 @@
                 title="Compile and run your C# code">
             @if (isCompiling)
             {
-                <span class="spinner-border spinner-border-sm" role="status" aria-label="Compiling..."></span>
+                <span class="run-waiting" role="status" aria-label="Running...">
+                    <span></span><span></span><span></span>
+                </span>
+                <span class="run-label">运行中</span>
             }
             else
             {
-                <span aria-hidden="true">&#9654;</span>
+                <span class="run-icon" aria-hidden="true">&#9654;</span>
+                <span class="run-label">运行代码</span>
             }
         </button>
         <div id="compile-instructions" class="sr-only">
@@ -247,6 +609,13 @@
                         }
                     </div>
                 </div>
+                <button class="btn btn-outline-secondary btn-sm"
+                        @onclick="StopExecution"
+                        disabled="@(!isCompiling)"
+                        title="停止当前 Worker 执行"
+                        aria-label="停止当前执行">
+                    Stop
+                </button>
                 <button class="btn btn-outline-secondary btn-sm" 
                         @onclick="ClearOutput"
                         @onkeydown="@(async (e) => await HandleKeyDown(e, ClearOutput))"
@@ -494,8 +863,8 @@
         font-size: 14px;
         line-height: 1.5;
         padding: 1rem;
-        background-color: #1e1e1e;
-        color: #d4d4d4;
+        background-color: var(--editor-bg, #1e1e1e);
+        color: var(--editor-text, #d4d4d4);
         tab-size: 4;
     }
 
@@ -515,8 +884,8 @@
         height: 100%;
         overflow-y: auto;
         padding: 1rem;
-        background-color: #0d1117;
-        color: #f0f6fc;
+        background-color: var(--console-bg, #0d1117);
+        color: var(--console-text, #f0f6fc);
         font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         font-size: 13px;
         line-height: 1.4;
@@ -683,6 +1052,57 @@ public class Program
     private bool showFullCode = false;
     private bool showSystemOutput = false;
     private string displayCode = "";
+
+    // iframe / URL style options. Examples:
+    // ?theme=light&accent=emerald&layout=stacked&chrome=minimal
+    private string theme = "dark";
+    private string accentName = "indigo";
+    private string layout = "split";
+    private string chrome = "full";
+    private string density = "comfortable";
+    private static readonly string[] ThemeOptions = { "dark", "light", "auto" };
+    private static readonly string[] AccentOptions = { "indigo", "blue", "emerald", "amber", "rose", "violet", "cyan", "orange" };
+    private double cornerRadius = 16;
+    private double editorFontSize = 14;
+
+    // Compile-time reference assemblies. Each build runs on its own Blazor runtime.
+#if NET8_0
+    private const string RuntimeLabel = ".NET 8";
+    private const string DefaultTargetFramework = "net8.0";
+    private static readonly string[] SupportedTargetFrameworks = { "net8.0" };
+#elif NET9_0
+    private const string RuntimeLabel = ".NET 9";
+    private const string DefaultTargetFramework = "net9.0";
+    private static readonly string[] SupportedTargetFrameworks = { "net8.0", "net9.0" };
+#else
+    private const string RuntimeLabel = ".NET 10";
+    private const string DefaultTargetFramework = "net10.0";
+    private static readonly string[] SupportedTargetFrameworks = { "net8.0", "net9.0", "net10.0" };
+#endif
+    private static string RuntimeBadge => $"{RuntimeLabel} · WASM";
+    private string targetFramework = DefaultTargetFramework;
+    private string completionMode = "auto";
+    private bool isSemanticBusy;
+    private bool isFormatting;
+    private bool formatAfterCompletion;
+    private static readonly string[] CompletionModeOptions = { "auto", "manual" };
+    private bool AutoSemanticCompletion => completionMode == "auto";
+
+    private CancellationTokenSource? completionDebounce;
+    private List<MetadataReference>? cachedMetadataReferences;
+    private string? cachedMetadataReferencesTarget;
+    private static readonly JsonSerializerOptions WorkerJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+    private static readonly string[] CompletionKeywords =
+    {
+        "using", "public", "private", "protected", "internal", "static", "class", "struct",
+        "record", "interface", "enum", "namespace", "void", "int", "long", "double", "float",
+        "decimal", "bool", "char", "string", "object", "var", "new", "return", "if", "else",
+        "for", "foreach", "while", "do", "switch", "case", "break", "continue", "try", "catch",
+        "finally", "throw", "true", "false", "null", "Console", "Math", "List", "Dictionary"
+    };
     
     private const string WelcomeMessage = @"<span class='info'>Real Blazor WebAssembly C# Compiler Ready!</span><br/>
 <span class='info'>This environment provides:</span><br/>
@@ -695,9 +1115,25 @@ public class Program
 <span class='info'>Click 'Compile & Run' to execute your C# code!</span><br/>
 ";
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("playgroundCompletion.attach", "code-editor", "code-completion");
+        }
+    }
+
     private async Task CompileAndRun()
     {
+        var waitStarted = DateTime.UtcNow;
         isCompiling = true;
+        HideCompletion();
+
+        // Blazor WebAssembly is single-threaded: Roslyn compilation blocks the
+        // browser main thread. Yield once so Blazor can paint the waiting state
+        // before the synchronous compile/execute work starts.
+        StateHasChanged();
+        await Task.Delay(40);
         
         // Clear output variables - let Blazor handle the DOM updates
         if (!showSystemOutput)
@@ -726,7 +1162,7 @@ public class Program
                 OnCodeChanged(new ChangeEventArgs { Value = displayCode });
             }
             
-            var result = await CompileCSharpCode(sourceCode);
+            var result = await CompileCSharpCodeViaWorker(sourceCode);
             
             if (result.Success)
             {
@@ -736,7 +1172,9 @@ public class Program
                 // DON'T call StateHasChanged here - we don't want Blazor to render
                 // any of these messages while the interactive execution is happening
                 
-                var executionResult = await ExecuteAssembly(result.Assembly!);
+                var executionResult = result.AssemblyBytes is { Length: > 0 }
+                    ? await ExecuteAssemblyInWorker(result.AssemblyBytes)
+                    : await ExecuteAssembly(result.Assembly!);
                 
                 // Now that interactive execution is done, add completion message
                 AddOutput(".NET WebAssembly execution completed successfully!", "success");
@@ -758,6 +1196,11 @@ public class Program
                     AddErrorOutput($"Line {lineNumber}: {error.GetMessage()}", "error");
                 }
                 
+                foreach (var error in result.ErrorMessages)
+                {
+                    AddErrorOutput(error, "error");
+                }
+
                 // Display errors using the same strategy as regular output
                 if (showSystemOutput)
                 {
@@ -788,6 +1231,11 @@ public class Program
         }
         finally
         {
+            var elapsed = DateTime.UtcNow - waitStarted;
+            if (elapsed < TimeSpan.FromMilliseconds(450))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(450) - elapsed);
+            }
             isCompiling = false;
             StateHasChanged();
         }
@@ -864,6 +1312,22 @@ public class Program
             // Ignore errors
         }
         
+        StateHasChanged();
+    }
+
+    private async Task StopExecution()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("roslynWorker.terminate");
+        }
+        catch
+        {
+            // The worker may already be gone.
+        }
+
+        isCompiling = false;
+        AddErrorOutput("执行已停止。", "warning");
         StateHasChanged();
     }
 
@@ -972,8 +1436,509 @@ public class Program
         return string.Join("\n", unindentedLines);
     }
 
+    private string ThemeClass => $"theme-{theme}";
+    private string LayoutClass => $"layout-{layout}";
+    private string ChromeClass => $"chrome-{chrome}";
+    private string DensityClass => $"density-{density}";
+
+    private string ContainerStyle
+    {
+        get
+        {
+            var accent = ResolveAccent(accentName);
+            return $"--accent: {accent}; --accent-rgb: {HexToRgb(accent)}; --radius: {cornerRadius:0}px; --editor-font-size: {editorFontSize:0}px;";
+        }
+    }
+
+    private void ApplyStyleParameters()
+    {
+        theme = NormalizeOption(GetQueryParameter("theme"), "dark", "dark", "light", "auto");
+        layout = NormalizeOption(GetQueryParameter("layout"), "split", "split", "stacked");
+        chrome = NormalizeOption(GetQueryParameter("chrome"), "full", "full", "minimal", "none");
+        density = NormalizeOption(GetQueryParameter("density"), "comfortable", "comfortable", "compact");
+        completionMode = NormalizeOption(GetQueryParameter("completion"), "auto", "auto", "manual");
+        targetFramework = NormalizeTargetFramework(GetQueryParameter("target"));
+        if (!SupportedTargetFrameworks.Contains(targetFramework))
+        {
+            targetFramework = DefaultTargetFramework;
+        }
+
+        var requestedAccent = GetQueryParameter("accent");
+        if (!string.IsNullOrWhiteSpace(requestedAccent))
+        {
+            accentName = requestedAccent.Trim();
+        }
+
+        if (double.TryParse(GetQueryParameter("radius"), out var radius))
+        {
+            cornerRadius = Math.Clamp(radius, 0, 32);
+        }
+
+        if (double.TryParse(GetQueryParameter("fontsize"), out var fontSize))
+        {
+            editorFontSize = Math.Clamp(fontSize, 11, 22);
+        }
+    }
+
+    private string? GetQueryParameter(string name)
+    {
+        var query = new Uri(Navigation.Uri).Query.TrimStart('?');
+        if (string.IsNullOrEmpty(query))
+        {
+            return null;
+        }
+
+        foreach (var pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = pair.IndexOf('=');
+            var key = separator >= 0 ? pair[..separator] : pair;
+            if (!string.Equals(Uri.UnescapeDataString(key), name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return separator >= 0
+                ? Uri.UnescapeDataString(pair[(separator + 1)..].Replace('+', ' '))
+                : string.Empty;
+        }
+
+        return null;
+    }
+
+    private static string NormalizeOption(string? value, string fallback, params string[] allowed)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        var candidate = value.Trim().ToLowerInvariant();
+        return allowed.Contains(candidate) ? candidate : fallback;
+    }
+
+    private static string NormalizeTargetFramework(string? value)
+    {
+        return (value ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "net8" or "net8.0" => "net8.0",
+            "net9" or "net9.0" => "net9.0",
+            "net10" or "net10.0" => "net10.0",
+            _ => DefaultTargetFramework
+        };
+    }
+
+    private static Type GetReferenceAssemblyType(string target)
+    {
+#if NET8_0
+        return typeof(Basic.Reference.Assemblies.Net80);
+#elif NET9_0
+        return target == "net9.0"
+            ? typeof(Basic.Reference.Assemblies.Net90)
+            : typeof(Basic.Reference.Assemblies.Net80);
+#else
+        return target switch
+        {
+            "net8.0" => typeof(Basic.Reference.Assemblies.Net80),
+            "net9.0" => typeof(Basic.Reference.Assemblies.Net90),
+            _ => typeof(Basic.Reference.Assemblies.Net100)
+        };
+#endif
+#if false
+        // Unreachable fallback retained for older compilers.
+        return target == "net8.0"
+            ? typeof(Basic.Reference.Assemblies.Net80)
+            : typeof(Basic.Reference.Assemblies.Net90);
+#endif
+    }
+
+    private static string GetTargetFrameworkLabel(string target)
+    {
+        return target switch
+        {
+            "net8.0" => ".NET 8",
+            "net9.0" => ".NET 9",
+            "net10.0" => ".NET 10",
+            _ => target
+        };
+    }
+
+    private void OnThemeChanged(ChangeEventArgs e)
+    {
+        HideCompletion();
+        theme = NormalizeOption(e.Value?.ToString(), "dark", "dark", "light", "auto");
+    }
+
+    private void OnAccentChanged(ChangeEventArgs e)
+    {
+        HideCompletion();
+        var requested = (e.Value?.ToString() ?? string.Empty).Trim().ToLowerInvariant();
+        accentName = AccentOptions.Contains(requested) ? requested : "indigo";
+    }
+
+    private void OnAutoCompletionChanged(ChangeEventArgs e)
+    {
+        completionMode = (e.Value as bool? ?? false) ? "auto" : "manual";
+    }
+
+    private void OnFormatAfterCompletionChanged(ChangeEventArgs e)
+    {
+        formatAfterCompletion = e.Value as bool? ?? false;
+    }
+
+    private static string GetCompletionModeLabel(string value)
+    {
+        return value == "manual" ? "手动" : "自动";
+    }
+
+    private static string GetThemeLabel(string value)
+    {
+        return value switch
+        {
+            "dark" => "深色",
+            "light" => "浅色",
+            "auto" => "跟随系统",
+            _ => value
+        };
+    }
+
+    private void OnTargetFrameworkChanged(ChangeEventArgs e)
+    {
+        HideCompletion();
+        var requestedTarget = NormalizeTargetFramework(e.Value?.ToString());
+        targetFramework = SupportedTargetFrameworks.Contains(requestedTarget) ? requestedTarget : DefaultTargetFramework;
+        AddOutput($"Compilation target changed to {targetFramework}.", "info");
+    }
+
+    private async Task FormatCodeAsync()
+    {
+        if (isFormatting)
+        {
+            return;
+        }
+
+        HideCompletion();
+        isFormatting = true;
+        StateHasChanged();
+
+        try
+        {
+            if (!showFullCode)
+            {
+                OnCodeChanged(new ChangeEventArgs { Value = displayCode });
+            }
+
+            var formatted = await JSRuntime.InvokeAsync<string>("roslynWorker.format", sourceCode);
+            if (!string.IsNullOrWhiteSpace(formatted))
+            {
+                sourceCode = formatted.TrimEnd();
+                UpdateDisplayCode();
+            }
+        }
+        catch (Exception ex)
+        {
+            AddErrorOutput($"Format error: {ex.Message}", "error");
+        }
+        finally
+        {
+            isFormatting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async void HideCompletion()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("playgroundCompletion.hide");
+        }
+        catch
+        {
+            // The editor may not be rendered yet.
+        }
+    }
+
+    private async Task OnCodeInputAsync()
+    {
+        var accepted = false;
+        try
+        {
+            accepted = await JSRuntime.InvokeAsync<bool>("playgroundCompletion.consumeAccepted");
+        }
+        catch
+        {
+            // Completion interop is optional.
+        }
+
+        if (accepted && formatAfterCompletion)
+        {
+            await FormatCodeAsync();
+            return;
+        }
+
+        if (!AutoSemanticCompletion)
+        {
+            return;
+        }
+
+        completionDebounce?.Cancel();
+        var cts = new CancellationTokenSource();
+        completionDebounce = cts;
+
+        try
+        {
+            await Task.Delay(420, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (AutoSemanticCompletion)
+        {
+            await ShowSemanticCompletionsAsync();
+        }
+    }
+
+    private async Task ShowSemanticCompletionsAsync()
+    {
+        if (isSemanticBusy)
+        {
+            return;
+        }
+
+        isSemanticBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            var displayPosition = await JSRuntime.InvokeAsync<int>("playgroundCompletion.getSelectionStart", "code-editor");
+            var (code, position) = BuildCompletionSource(displayPosition);
+            position = Math.Clamp(position, 0, code.Length);
+
+            if (position > 0)
+            {
+                var last = code[position - 1];
+                if (!char.IsLetterOrDigit(last) && last != '_' && last != '.')
+                {
+                    return;
+                }
+            }
+
+            var json = await JSRuntime.InvokeAsync<string>("roslynWorker.complete", code, position, targetFramework);
+            var suggestions = JsonSerializer.Deserialize<string[]>(json) ?? Array.Empty<string>();
+
+            // Keep the instant syntax-keyword menu when semantic completion
+            // has no result; only replace it when we actually have symbols.
+            if (suggestions.Length > 0)
+            {
+                await JSRuntime.InvokeVoidAsync("playgroundCompletion.show", (object)suggestions);
+            }
+        }
+        catch
+        {
+            // Completion must never break normal editing.
+        }
+        finally
+        {
+            isSemanticBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private string[] GetSemanticCompletions(int displayPosition)
+    {
+        try
+        {
+            var (code, position) = BuildCompletionSource(displayPosition);
+            if (code.Length == 0 || code.Length > 30000)
+            {
+                return Array.Empty<string>();
+            }
+
+            var earlyPosition = Math.Clamp(position, 0, code.Length);
+            var earlyWordStart = earlyPosition;
+            while (earlyWordStart > 0 &&
+                   (char.IsLetterOrDigit(code[earlyWordStart - 1]) || code[earlyWordStart - 1] == '_'))
+            {
+                earlyWordStart--;
+            }
+
+            var earlyMemberAccess = earlyWordStart > 0 && code[earlyWordStart - 1] == '.';
+            if (!earlyMemberAccess && earlyPosition - earlyWordStart < 2)
+            {
+                return Array.Empty<string>();
+            }
+
+            var tree = CSharpSyntaxTree.ParseText(code);
+            var references = GetMetadataReferences();
+            var compilation = CSharpCompilation.Create(
+                "CompletionAssembly",
+                new[] { tree },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var model = compilation.GetSemanticModel(tree);
+            var root = tree.GetRoot();
+
+            position = Math.Clamp(position, 0, code.Length);
+            var wordStart = position;
+            while (wordStart > 0 &&
+                   (char.IsLetterOrDigit(code[wordStart - 1]) || code[wordStart - 1] == '_'))
+            {
+                wordStart--;
+            }
+
+            var isMemberAccess = wordStart > 0 && code[wordStart - 1] == '.';
+            var prefix = code[wordStart..position];
+            if (prefix.Length == 0 && !isMemberAccess)
+            {
+                return Array.Empty<string>();
+            }
+
+            var suggestions = new HashSet<string>(StringComparer.Ordinal);
+            if (isMemberAccess)
+            {
+                var token = root.FindToken(Math.Max(0, wordStart - 2));
+                var typeInfo = model.GetTypeInfo(token.Parent!);
+                var type = typeInfo.Type ?? typeInfo.ConvertedType;
+                if (type != null)
+                {
+                    foreach (var member in type.GetMembers())
+                    {
+                        if (!member.IsImplicitlyDeclared && member.CanBeReferencedByName)
+                        {
+                            suggestions.Add(member.Name);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                foreach (var symbol in model.LookupSymbols(position))
+                {
+                    if (symbol.CanBeReferencedByName)
+                    {
+                        suggestions.Add(symbol.Name);
+                    }
+                }
+
+                foreach (var keyword in CompletionKeywords)
+                {
+                    suggestions.Add(keyword);
+                }
+            }
+
+            return suggestions
+                .Where(item => prefix.Length == 0 || item.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+                .Take(24)
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private (string Code, int Position) BuildCompletionSource(int displayPosition)
+    {
+        displayPosition = Math.Clamp(displayPosition, 0, displayCode.Length);
+        if (showFullCode)
+        {
+            return (displayCode, displayPosition);
+        }
+
+        const string prefix = "using System;\n\npublic class Program\n{\n    public static void Main()\n    {\n";
+        var before = displayCode[..displayPosition];
+        var lines = before.Split('\n');
+        var sourcePosition = prefix.Length;
+
+        for (var i = 0; i < lines.Length - 1; i++)
+        {
+            sourcePosition += (string.IsNullOrWhiteSpace(lines[i]) ? 0 : 8) + lines[i].Length + 1;
+        }
+
+        sourcePosition += (string.IsNullOrWhiteSpace(lines[^1]) ? 0 : 8) + lines[^1].Length;
+
+        var code = prefix + IndentCode(displayCode, "        ") + "\n    }\n}";
+        return (code, sourcePosition);
+    }
+
+    private List<MetadataReference> GetMetadataReferences()
+    {
+        if (cachedMetadataReferences != null && cachedMetadataReferencesTarget == targetFramework)
+        {
+            return cachedMetadataReferences;
+        }
+
+        var references = new List<MetadataReference>();
+        try
+        {
+            var referenceAssemblyType = GetReferenceAssemblyType(targetFramework);
+            var referencesType = referenceAssemblyType.GetNestedType("References");
+            if (referencesType != null)
+            {
+                foreach (var property in referencesType.GetProperties(BindingFlags.Public | BindingFlags.Static))
+                {
+                    var value = property.GetValue(null);
+                    if (value is MetadataReference reference)
+                    {
+                        references.Add(reference);
+                    }
+                    else if (value is IEnumerable<MetadataReference> collection)
+                    {
+                        references.AddRange(collection);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Fall back to an empty reference set; keyword completion still works.
+        }
+
+        cachedMetadataReferences = references;
+        cachedMetadataReferencesTarget = targetFramework;
+        return references;
+    }
+
+    private static string ResolveAccent(string value)
+    {
+        var palette = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["indigo"] = "#6366f1",
+            ["blue"] = "#3b82f6",
+            ["emerald"] = "#10b981",
+            ["amber"] = "#f59e0b",
+            ["rose"] = "#f43f5e",
+            ["violet"] = "#8b5cf6",
+            ["cyan"] = "#06b6d4",
+            ["orange"] = "#f97316"
+        };
+
+        if (palette.TryGetValue(value, out var named))
+        {
+            return named;
+        }
+
+        var hex = value.Trim().TrimStart('#');
+        return hex.Length == 6 && hex.All(c => Uri.IsHexDigit(c)) ? $"#{hex}" : palette["indigo"];
+    }
+
+    private static string HexToRgb(string hex)
+    {
+        var value = hex.TrimStart('#');
+        if (value.Length != 6 || !value.All(c => Uri.IsHexDigit(c)))
+        {
+            return "99, 102, 241";
+        }
+
+        return $"{Convert.ToInt32(value[..2], 16)}, {Convert.ToInt32(value[2..4], 16)}, {Convert.ToInt32(value[4..6], 16)}";
+    }
+
     protected override void OnInitialized()
     {
+        ApplyStyleParameters();
+
         // Set welcome message based on system output toggle
         if (showSystemOutput)
         {
@@ -1022,6 +1987,7 @@ public class Program
 
     private void LoadSampleCode()
     {
+        HideCompletion();
         // Replace the current source code with the sample code
         sourceCode = sampleCode;
         
@@ -1067,7 +2033,11 @@ public class Program
     private async Task HandleEditorKeyDown(KeyboardEventArgs e)
     {
         // Ctrl+Enter to compile and run
-        if (e.CtrlKey && e.Key == "Enter")
+        if (e.CtrlKey && e.ShiftKey && e.Key == "f")
+        {
+            await FormatCodeAsync();
+        }
+        else if (e.CtrlKey && e.Key == "Enter")
         {
             await CompileAndRun();
         }
@@ -1077,9 +2047,48 @@ public class Program
             LoadSampleCode();
         }
         // Ctrl+K to clear output
+        // Ctrl+Space to request semantic completion
+        else if (e.CtrlKey && e.Key == " ")
+        {
+            await ShowSemanticCompletionsAsync();
+        }
         else if (e.CtrlKey && e.Key == "k")
         {
             ClearOutput();
+        }
+    }
+
+    private async Task<CompilationResult> CompileCSharpCodeViaWorker(string code)
+    {
+        try
+        {
+            var json = await JSRuntime.InvokeAsync<string>("roslynWorker.compile", code, targetFramework);
+            var result = JsonSerializer.Deserialize<WorkerCompilationResult>(json, WorkerJsonOptions);
+            if (result is null)
+            {
+                return new CompilationResult
+                {
+                    Success = false,
+                    ErrorMessages = new List<string> { "Roslyn worker returned an empty response." }
+                };
+            }
+
+            if (result.Success && !string.IsNullOrWhiteSpace(result.AssemblyBase64))
+            {
+                var assemblyBytes = Convert.FromBase64String(result.AssemblyBase64);
+                return new CompilationResult { Success = true, AssemblyBytes = assemblyBytes };
+            }
+
+            return new CompilationResult
+            {
+                Success = false,
+                ErrorMessages = result.Errors ?? new List<string>()
+            };
+        }
+        catch (Exception ex)
+        {
+            AddErrorOutput($"Roslyn worker unavailable ({ex.Message}); falling back to main-thread compilation.", "warning");
+            return await CompileCSharpCode(code);
         }
     }
 
@@ -1127,11 +2136,11 @@ public class Program
             // Method 1: Try Basic.Reference.Assemblies.Net90 with deep API exploration
             try
             {
-                var net90Type = typeof(Basic.Reference.Assemblies.Net90);
-                AddOutput($"Basic.Reference.Assemblies.Net90 type loaded: {net90Type.FullName}", "info");
+                var referenceAssemblyType = GetReferenceAssemblyType(targetFramework);
+                AddOutput($"Reference assembly set: {targetFramework} ({referenceAssemblyType.FullName})", "info");
                 
                 // Access the References nested type
-                var referencesType = net90Type.GetNestedType("References");
+                var referencesType = referenceAssemblyType.GetNestedType("References");
                 if (referencesType != null)
                 {
                     AddOutput($"Found References nested type: {referencesType.FullName}", "success");
@@ -1149,7 +2158,7 @@ public class Program
                     // Try different approaches to get references
                     // Approach 1: Look for MetadataReference properties
                     var refProperties = referencesType.GetProperties(BindingFlags.Public | BindingFlags.Static)
-                        .Where(p => p.PropertyType == typeof(MetadataReference))
+                        .Where(p => typeof(MetadataReference).IsAssignableFrom(p.PropertyType))
                         .ToArray();
                     AddOutput($"Found {refProperties.Length} MetadataReference properties", "info");
                     
@@ -1212,7 +2221,7 @@ public class Program
             }
             catch (Exception ex)
             {
-                AddErrorOutput($"Basic.Reference.Assemblies.Net90 failed: {ex.Message}", "error");
+                AddErrorOutput($"Reference assembly loading failed for {targetFramework}: {ex.Message}", "error");
                 AddErrorOutput($"Exception details: {ex.GetType().Name}", "error");
             }
             
@@ -1319,6 +2328,41 @@ public class Program
         {
             AddErrorOutput($"GetAssemblyBytes error for {assembly.GetName().Name}: {ex.Message}", "error");
             return null;
+        }
+    }
+
+    private async Task<string> ExecuteAssemblyInWorker(byte[] assemblyBytes)
+    {
+        var inputs = new List<string>();
+        var assemblyBase64 = Convert.ToBase64String(assemblyBytes);
+
+        while (true)
+        {
+            var inputsJson = JsonSerializer.Serialize(inputs);
+            var json = await JSRuntime.InvokeAsync<string>("roslynWorker.execute", assemblyBase64, inputsJson);
+            var result = JsonSerializer.Deserialize<WorkerRunResult>(json, WorkerJsonOptions);
+            if (result is null)
+            {
+                AddErrorOutput("Roslyn worker returned an empty execution response.", "error");
+                return "";
+            }
+
+            await DisplayOutput(result.Output ?? "");
+
+            if (result.Status == "completed")
+            {
+                return "";
+            }
+
+            if (result.Status == "inputRequired")
+            {
+                var input = await JSRuntime.InvokeAsync<string>("promptForInput", "");
+                inputs.Add(input ?? "");
+                continue;
+            }
+
+            AddErrorOutput($"Execution error: {result.Error}", "error");
+            return result.Error ?? "";
         }
     }
 
@@ -1479,7 +2523,7 @@ public class Program
                     
                     // Add as pre-formatted text to preserve whitespace, escape HTML
                     var escaped = trimmedOutput.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
-                    output += $"<pre style='color: #f0f6fc; margin: 0; padding: 0; white-space: pre-wrap; word-wrap: break-word;'>{escaped}</pre>";
+                    output += $"<pre style='color: inherit; margin: 0; padding: 0; white-space: pre-wrap; word-wrap: break-word;'>{escaped}</pre>";
                 }
                 StateHasChanged();
                 await ScrollToBottom();
@@ -1524,7 +2568,7 @@ public class Program
                             
                             const preElement = document.createElement('pre');
                             preElement.textContent = output;
-                            preElement.style.color = '#f0f6fc';
+                            preElement.style.color = 'inherit';
                             preElement.style.margin = '0';
                             preElement.style.padding = '0';
                             preElement.style.fontFamily = 'inherit';
@@ -1581,6 +2625,22 @@ public class Program
     {
         public bool Success { get; set; }
         public Assembly? Assembly { get; set; }
+        public byte[]? AssemblyBytes { get; set; }
         public List<Diagnostic> Errors { get; set; } = new();
+        public List<string> ErrorMessages { get; set; } = new();
+    }
+
+    private class WorkerCompilationResult
+    {
+        public bool Success { get; set; }
+        public string? AssemblyBase64 { get; set; }
+        public List<string>? Errors { get; set; }
+    }
+
+    private class WorkerRunResult
+    {
+        public string? Status { get; set; }
+        public string? Output { get; set; }
+        public string? Error { get; set; }
     }
 }
