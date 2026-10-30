@@ -23,6 +23,7 @@ This repository is an extended fork of [MicrosoftLearning/c-sharp-minor](https:/
 - **Web Worker execution sandbox**: Roslyn compilation, semantic completion, and user-code execution run off the UI thread; a Stop button terminates runaway programs.
 - **Compact editor settings**: Compile target, automatic completion, and format-after-completion live in a `⚙ 设置` popover.
 - **Bilingual docs**: English and 简体中文 documentation for the runtime, iframe API, deployment, and fork changes.
+- **AI integration docs**: `AGENTS.md`, `llms.txt`, and `documentation/ai-integration.md` describe iframe rules, Playwright selectors, and current limitations for AI/automation.
 - **Static deployment**: Publishes as a self-contained static site for GitHub Pages, Cloudflare Pages, Nginx, or any SPA-capable host.
 - **Open source attribution**: Extended from `MicrosoftLearning/c-sharp-minor`; MIT licensed.
 

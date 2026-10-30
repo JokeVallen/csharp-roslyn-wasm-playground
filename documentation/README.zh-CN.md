@@ -8,12 +8,13 @@
 
 | 文档 | 内容 |
 | --- | --- |
+| [AI 与自动化集成](ai-integration.zh-CN.md) | 固定地址、iframe 规则、Playwright 选择器和当前限制 |
 | [iframe 样式 API](iframe-style-api.zh-CN.md) | 主题、强调色、布局、chrome、密度、圆角和字号等 URL 参数 |
 | [浏览器 C# 运行时](browser-runtime.zh-CN.md) | Roslyn 编译与 WebAssembly 执行流程、支持的代码结构及限制 |
 | [Console API 参考](console-api.zh-CN.md) | 注入到用户代码中的 `Console` 子集 |
 | [运行时版本](runtimes.zh-CN.md) | 真实的 .NET 8 / .NET 9 / .NET 10 部署与 URL 结构 |
 | [目标框架选择](target-frameworks.zh-CN.md) | 使用 .NET 8 / .NET 9 / .NET 10 引用程序集编译用户代码 |
-| [静态部署指南](deployment.zh-CN.md) | GitHub Pages、自托管发布、base href、SPA fallback 与 iframe 响应头 |
+| [静态部署指南](deployment.zh-CN.md) | Cloudflare Pages、GitHub Pages、自托管发布、base href、SPA fallback 与 iframe 响应头 |
 | [与上游项目的差异](../MODIFICATIONS.zh-CN.md) | 本分支相对 `MicrosoftLearning/c-sharp-minor` 的修改 |
 | [项目 README](../README.zh-CN.md) | 功能特性、快速开始与仓库概览 |
 

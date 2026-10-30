@@ -1,0 +1,27 @@
+# C# Playground
+
+> Browser-only C# playground built with Blazor WebAssembly and Roslyn. Embeddable in blogs and documentation via iframe; no backend API.
+
+## Primary
+
+- [AI and agent integration](AGENTS.md): canonical URL, iframe rules, Playwright selectors, limitations.
+- [Live site](https://csharp-roslyn-wasm-playground.pages.dev/): default .NET 10 runtime.
+- [.NET 8 runtime](https://csharp-roslyn-wasm-playground.pages.dev/net8/)
+- [.NET 9 runtime](https://csharp-roslyn-wasm-playground.pages.dev/net9/)
+- [.NET 10 runtime](https://csharp-roslyn-wasm-playground.pages.dev/net10/)
+
+## Documentation
+
+- [Documentation index](documentation/README.md)
+- [Iframe style API](documentation/iframe-style-api.md)
+- [Browser C# runtime](documentation/browser-runtime.md)
+- [Console API](documentation/console-api.md)
+- [Runtime versions](documentation/runtimes.md)
+- [Target framework selection](documentation/target-frameworks.md)
+- [Deployment guide](documentation/deployment.md)
+
+## Notes
+
+- No HTTP compile/run API. Validate examples with Playwright if needed.
+- Use `completion=manual` and `loading="lazy"` for blog embeds.
+- Use `domcontentloaded` rather than `networkidle` when automating.

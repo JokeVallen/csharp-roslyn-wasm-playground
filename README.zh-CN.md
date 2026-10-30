@@ -23,6 +23,7 @@
 - **Web Worker 执行沙盒**：Roslyn 编译、语义补全和用户代码执行均运行在 UI 线程之外；Stop 按钮可终止失控程序。
 - **紧凑的编辑器设置**：编译目标、自动补全和接纳补全后格式化集中在 `⚙ 设置` 弹层中。
 - **中英双语文档**：运行时、iframe API、部署和分支差异均有英文与简体中文版本。
+- **AI 集成文档**：`AGENTS.md`、`llms.txt` 和 `documentation/ai-integration.md` 说明 iframe 规则、Playwright 选择器和当前限制。
 - **纯静态部署**：构建产物可部署到 GitHub Pages、Cloudflare Pages、Nginx 或任何支持 SPA fallback 的静态托管环境。
 - **开源归属清晰**：基于 `MicrosoftLearning/c-sharp-minor` 扩展，采用 MIT 许可证。
 

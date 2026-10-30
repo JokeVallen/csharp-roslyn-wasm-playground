@@ -8,12 +8,13 @@ This directory contains focused documentation for the playground's user-facing f
 
 | Document | What it covers |
 | --- | --- |
+| [AI and agent integration](ai-integration.md) | Stable URLs, iframe rules, Playwright selectors, and limitations for AI/automation |
 | [Iframe style API](iframe-style-api.md) | URL parameters for theme, accent, layout, chrome, density, radius, and font size |
 | [Browser C# runtime](browser-runtime.md) | How Roslyn compilation and WebAssembly execution work, supported code shape, and limitations |
 | [Console API reference](console-api.md) | The `Console` subset injected into user code |
 | [Runtime versions](runtimes.md) | Real .NET 8 / .NET 9 / .NET 10 deployments and URL layout |
 | [Target framework selection](target-frameworks.md) | Compile user code against .NET 8 / .NET 9 / .NET 10 reference assemblies |
-| [Static deployment guide](deployment.md) | GitHub Pages, self-hosted publishing, base href, SPA fallback, and iframe headers |
+| [Static deployment guide](deployment.md) | Cloudflare Pages, GitHub Pages, self-hosted publishing, base href, SPA fallback, and iframe headers |
 | [Differences from upstream](../MODIFICATIONS.md) | What this fork changes compared with `MicrosoftLearning/c-sharp-minor` |
 | [Project README](../README.md) | Features, quick start, and repository overview |
 
