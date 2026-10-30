@@ -8,7 +8,7 @@
 
 ```html
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?theme=light&accent=emerald&density=compact&chrome=minimal&radius=12"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?theme=light&accent=emerald&density=compact&chrome=minimal&radius=12"
   width="100%"
   height="560"
   frameborder="0"
@@ -61,7 +61,7 @@
 
 ```html
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?theme=light&accent=blue&chrome=minimal&density=compact"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?theme=light&accent=blue&chrome=minimal&density=compact"
   width="100%" height="520" frameborder="0" loading="lazy"
   title="C# Playground"></iframe>
 ```
@@ -70,7 +70,7 @@
 
 ```html
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?theme=dark&accent=emerald&density=comfortable&radius=8"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?theme=dark&accent=emerald&density=comfortable&radius=8"
   width="100%" height="680" frameborder="0" loading="lazy"
   title="C# Playground"></iframe>
 ```
@@ -79,7 +79,7 @@
 
 ```html
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?layout=stacked&chrome=none&fontsize=13"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?layout=stacked&chrome=none&fontsize=13"
   width="100%" height="760" frameborder="0" loading="lazy"
   title="C# Playground"></iframe>
 ```

@@ -46,6 +46,7 @@ publish/wwwroot/
 | --- | --- |
 | `https://example.com/` | `/` |
 | `https://example.com/csharp-playground/` | `/csharp-playground/` |
+| `https://csharp-roslyn-wasm-playground.pages.dev/` | `/` |
 | `https://jokevallen.github.io/csharp-roslyn-wasm-playground/` | `/csharp-roslyn-wasm-playground/` |
 
 辅助脚本会自动重写 base href：

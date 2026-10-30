@@ -46,6 +46,7 @@ The final `<base href>` must match the URL path where the app is served and must
 | --- | --- |
 | `https://example.com/` | `/` |
 | `https://example.com/csharp-playground/` | `/csharp-playground/` |
+| `https://csharp-roslyn-wasm-playground.pages.dev/` | `/` |
 | `https://jokevallen.github.io/csharp-roslyn-wasm-playground/` | `/csharp-roslyn-wasm-playground/` |
 
 The helper scripts rewrite the base href for you:

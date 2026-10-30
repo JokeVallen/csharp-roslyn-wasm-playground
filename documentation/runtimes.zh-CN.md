@@ -17,16 +17,16 @@
 ### 直接访问 URL
 
 ```text
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/net8/
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/net9/
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/net10/
+https://csharp-roslyn-wasm-playground.pages.dev/net8/
+https://csharp-roslyn-wasm-playground.pages.dev/net9/
+https://csharp-roslyn-wasm-playground.pages.dev/net10/
 ```
 
 ### iframe
 
 ```html
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/net8/?theme=light&accent=blue"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/net8/?theme=light&accent=blue"
   width="100%" height="600" frameborder="0" loading="lazy"
   title=".NET 8 上的 C# Playground"></iframe>
 ```
@@ -36,9 +36,9 @@ https://jokevallen.github.io/csharp-roslyn-wasm-playground/net10/
 根页面支持 `runtime` 查询参数，并跳转到对应构建：
 
 ```text
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/?runtime=net8.0
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/?runtime=net9.0
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/?runtime=net10.0
+https://csharp-roslyn-wasm-playground.pages.dev/?runtime=net8.0
+https://csharp-roslyn-wasm-playground.pages.dev/?runtime=net9.0
+https://csharp-roslyn-wasm-playground.pages.dev/?runtime=net10.0
 ```
 
 这是页面跳转，不是页面内运行时切换。已经加载的 Blazor WebAssembly 页面无法替换其打包的 `dotnet.wasm`。

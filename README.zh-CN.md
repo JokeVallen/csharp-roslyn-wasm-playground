@@ -8,7 +8,7 @@
 
 > **说明**：本项目是社区分支，并非 Microsoft 官方支持的产品或服务。项目按“原样”提供，不附带任何形式的担保。原始 MIT 许可证及版权声明保留在 [LICENSE](LICENSE) 中。
 
-**在线演示：** [https://jokevallen.github.io/csharp-roslyn-wasm-playground/](https://jokevallen.github.io/csharp-roslyn-wasm-playground/)  
+**在线演示：** [https://csharp-roslyn-wasm-playground.pages.dev/](https://csharp-roslyn-wasm-playground.pages.dev/)  
 **原项目：** [https://github.com/MicrosoftLearning/c-sharp-minor](https://github.com/MicrosoftLearning/c-sharp-minor)
 
 ## ✨ 功能特性
@@ -80,11 +80,15 @@ deploy/nginx.conf.example     # Nginx SPA 配置示例
 
 ## 🚀 部署
 
-每次推送到 `main` 分支都会自动部署到 GitHub Pages：
+主部署地址为 Cloudflare Pages，每次推送到 `main` 分支都会自动更新：
+
+**https://csharp-roslyn-wasm-playground.pages.dev/**
+
+GitHub Pages 继续作为镜像保留：
 
 **https://jokevallen.github.io/csharp-roslyn-wasm-playground/**
 
-`.github/workflows/deploy.yml` 会依次执行：
+GitHub Pages 的 `.github/workflows/deploy.yml` 会依次执行：
 
 1. 分别执行 `dotnet publish -c Release -f net8.0|net9.0|net10.0`；
 2. 重写每个构建的 `<base href="...">` 并组装多运行时站点；
@@ -126,12 +130,12 @@ deploy/nginx.conf.example     # Nginx SPA 配置示例
 ```html
 <!-- 浅色、翠绿色强调、紧凑博客卡片 -->
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?theme=light&accent=emerald&density=compact&chrome=minimal&radius=12"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?theme=light&accent=emerald&density=compact&chrome=minimal&radius=12"
   width="100%" height="560" frameborder="0" loading="lazy"></iframe>
 
 <!-- 深色、自定义橙色强调、上下布局 -->
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?theme=dark&accent=ff7a18&layout=stacked&fontsize=13"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?theme=dark&accent=ff7a18&layout=stacked&fontsize=13"
   width="100%" height="760" frameborder="0" loading="lazy"></iframe>
 ```
 

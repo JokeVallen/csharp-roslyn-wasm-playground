@@ -103,7 +103,7 @@ Example:
 
 ```html
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?theme=light&accent=emerald&density=compact&chrome=minimal"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?theme=light&accent=emerald&density=compact&chrome=minimal"
   width="100%" height="560" frameborder="0" loading="lazy"></iframe>
 ```
 

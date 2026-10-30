@@ -17,16 +17,16 @@ The site root serves the .NET 10 build by default so existing links keep working
 ### Direct URL
 
 ```text
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/net8/
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/net9/
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/net10/
+https://csharp-roslyn-wasm-playground.pages.dev/net8/
+https://csharp-roslyn-wasm-playground.pages.dev/net9/
+https://csharp-roslyn-wasm-playground.pages.dev/net10/
 ```
 
 ### iframe
 
 ```html
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/net8/?theme=light&accent=blue"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/net8/?theme=light&accent=blue"
   width="100%" height="600" frameborder="0" loading="lazy"
   title="C# Playground on .NET 8"></iframe>
 ```
@@ -36,9 +36,9 @@ https://jokevallen.github.io/csharp-roslyn-wasm-playground/net10/
 The root page also accepts a `runtime` query parameter and redirects to the corresponding build:
 
 ```text
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/?runtime=net8.0
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/?runtime=net9.0
-https://jokevallen.github.io/csharp-roslyn-wasm-playground/?runtime=net10.0
+https://csharp-roslyn-wasm-playground.pages.dev/?runtime=net8.0
+https://csharp-roslyn-wasm-playground.pages.dev/?runtime=net9.0
+https://csharp-roslyn-wasm-playground.pages.dev/?runtime=net10.0
 ```
 
 This is a navigation redirect, not an in-page runtime switch. A loaded Blazor WebAssembly page cannot replace its bundled `dotnet.wasm`.

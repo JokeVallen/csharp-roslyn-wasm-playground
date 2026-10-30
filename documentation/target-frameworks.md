@@ -38,7 +38,7 @@ Example:
 
 ```html
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?target=net8.0&theme=light&accent=blue"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?target=net8.0&theme=light&accent=blue"
   width="100%" height="600" frameborder="0" loading="lazy"></iframe>
 ```
 

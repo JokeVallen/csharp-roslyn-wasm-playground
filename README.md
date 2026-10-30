@@ -8,7 +8,7 @@ This repository is an extended fork of [MicrosoftLearning/c-sharp-minor](https:/
 
 > **NOTE**: This is a community fork. It is not an officially supported Microsoft product or service and is provided as-is, without warranty of any kind. The original MIT license and copyright notice are retained in [LICENSE](LICENSE).
 
-**Live demo:** [https://jokevallen.github.io/csharp-roslyn-wasm-playground/](https://jokevallen.github.io/csharp-roslyn-wasm-playground/)  
+**Live demo:** [https://csharp-roslyn-wasm-playground.pages.dev/](https://csharp-roslyn-wasm-playground.pages.dev/)  
 **Original project:** [https://github.com/MicrosoftLearning/c-sharp-minor](https://github.com/MicrosoftLearning/c-sharp-minor)
 
 ## ✨ Features
@@ -85,11 +85,15 @@ deploy/nginx.conf.example     # example Nginx SPA configuration
 
 ## 🚀 Deployment
 
-The app is deployed automatically to GitHub Pages on every push to `main`:
+The primary deployment is Cloudflare Pages and updates automatically on every push to `main`:
+
+**https://csharp-roslyn-wasm-playground.pages.dev/**
+
+GitHub Pages remains available as a mirror:
 
 **https://jokevallen.github.io/csharp-roslyn-wasm-playground/**
 
-The workflow in `.github/workflows/deploy.yml`:
+The GitHub Pages workflow in `.github/workflows/deploy.yml`:
 
 1. runs `dotnet publish -c Release -f net8.0|net9.0|net10.0` for each runtime,
 2. rewrites each build's `<base href="...">` and assembles the multi-runtime site,
@@ -133,12 +137,12 @@ Examples:
 ```html
 <!-- Light, emerald, compact blog card -->
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?theme=light&accent=emerald&density=compact&chrome=minimal&radius=12"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?theme=light&accent=emerald&density=compact&chrome=minimal&radius=12"
   width="100%" height="560" frameborder="0" loading="lazy"></iframe>
 
 <!-- Stacked phone-friendly layout with custom accent -->
 <iframe
-  src="https://jokevallen.github.io/csharp-roslyn-wasm-playground/?theme=dark&accent=ff7a18&layout=stacked&fontsize=13"
+  src="https://csharp-roslyn-wasm-playground.pages.dev/?theme=dark&accent=ff7a18&layout=stacked&fontsize=13"
   width="100%" height="760" frameborder="0" loading="lazy"></iframe>
 ```
 
