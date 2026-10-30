@@ -77,10 +77,13 @@ so the published `_framework` output keeps standard `.dll` files available for i
 ## Editor assistance
 
 - Typing triggers an immediate local keyword/member popup after 120 ms; it does not run Roslyn on every keystroke.
-- Semantic completion is automatic by default after 420 ms of idle typing; switch `completion=manual` or use the toolbar selector to require `Ctrl + Space` / the `✨ 提示` button.
+- Semantic completion is automatic by default after 420 ms of idle typing; switch `completion=manual` or use the `⚙ 设置` panel to require `Ctrl + Space` / the `✨ 提示` button.
 - The semantic request is sent to `worker.js`, which boots the same .NET WebAssembly runtime and calls the exported `RoslynWorker.GetCompletions` method.
 - The main thread stays responsive because Roslyn compilation, semantic completion, and user-code execution all run in the worker. The main thread only handles editor events, console output, input prompts, and UI animation.
-- `ArrowUp` / `ArrowDown` move through suggestions, `Enter` or `Tab` inserts one, and `Escape` closes the popup.
+- `ArrowUp` / `ArrowDown` move through suggestions and `Escape` closes the popup.
+- When the popup is open, `Enter` or `Tab` accepts the selected suggestion. When the popup is closed, `Tab` inserts four spaces and `Shift + Tab` outdents the current line or selection.
+- `Ctrl + Shift + F` or the `🧹 格式化` button formats the current code with Roslyn `NormalizeWhitespace()` inside the worker.
+- The `⚙ 设置` panel contains the compile target, automatic semantic completion, and format-after-completion options.
 - The header toolbar can switch dark/light/system theme and accent color without reloading.
 - The Run button shows an animated waiting state while compilation and execution are in progress.
 
@@ -91,6 +94,7 @@ so the published `_framework` output keeps standard `.dll` files available for i
 | `Ctrl + Enter` | Compile and run |
 | `Ctrl + L` | Load sample code |
 | `Ctrl + Space` | Request semantic completion |
+| `Ctrl + Shift + F` | Format code |
 | `Ctrl + K` | Clear console |
 
 ## Input handling

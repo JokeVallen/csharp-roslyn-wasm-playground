@@ -77,10 +77,13 @@ typeof(MetadataReference).IsAssignableFrom(p.PropertyType)
 ## 编辑器辅助
 
 - 输入后 120ms 显示本地关键字/成员提示，不会在每次按键时运行 Roslyn。
-- 语义补全默认在停止输入 420ms 后自动触发；切换 `completion=manual` 或工具栏的“手动”模式后，可通过 `Ctrl + Space` 或 `✨ 提示` 按钮触发。
+- 语义补全默认在停止输入 420ms 后自动触发；切换 `completion=manual` 或使用 `⚙ 设置` 面板后，可通过 `Ctrl + Space` 或 `✨ 提示` 按钮触发。
 - 语义请求发送到 `worker.js`，在独立的 .NET WebAssembly 运行时中调用导出的 `RoslynWorker.GetCompletions`。
 - Roslyn 编译、语义补全和用户代码执行全部运行在 Worker 中；主线程只负责编辑器事件、控制台输出、输入提示和 UI 动效。
-- 使用 `↑` / `↓` 选择，`Enter` 或 `Tab` 插入，`Escape` 关闭。
+- 使用 `↑` / `↓` 选择，`Escape` 关闭提示。
+- 提示框打开时，`Enter` 或 `Tab` 接受当前建议；提示框关闭时，`Tab` 插入 4 个空格，`Shift + Tab` 对当前行或选区减少缩进。
+- `Ctrl + Shift + F` 或 `🧹 格式化` 按钮会调用 Worker 中的 Roslyn `NormalizeWhitespace()` 格式化代码。
+- `⚙ 设置` 面板包含编译目标、自动语义补全和接纳补全后格式化选项。
 - 顶部工具栏可直接切换深色/浅色/跟随系统主题和强调色，无需刷新。
 - 编译执行期间，运行按钮会显示等待动画。
 
@@ -91,6 +94,7 @@ typeof(MetadataReference).IsAssignableFrom(p.PropertyType)
 | `Ctrl + Enter` | 编译并运行 |
 | `Ctrl + L` | 加载示例代码 |
 | `Ctrl + Space` | 请求语义补全 |
+| `Ctrl + Shift + F` | 格式化代码 |
 | `Ctrl + K` | 清空控制台 |
 
 ## 输入处理
