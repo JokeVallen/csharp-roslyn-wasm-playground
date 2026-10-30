@@ -46,6 +46,21 @@ sed -i "s|<base href=\"[^\"]*\" />|<base href=\"${ROOT_BASE}\" />|" "$OUT_DIR/in
 
 touch "$OUT_DIR/.nojekyll"
 
+# Cloudflare Pages and Netlify compress responses themselves, and Cloudflare's
+# direct upload has a file-count limit. Drop precompressed copies and debug data.
+find "$OUT_DIR" -type f \( -name '*.br' -o -name '*.gz' -o -name '*.pdb' -o -name '*.map' \) -delete
+if [ -d "$OUT_DIR/lib/bootstrap" ]; then
+  find "$OUT_DIR/lib/bootstrap" -type f ! -name 'bootstrap.min.css' -delete
+fi
+
+cat > "$OUT_DIR/_headers" <<'EOF'
+/_framework/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+EOF
+
 echo "Published multi-runtime site to $OUT_DIR"
 echo "Root base href: $ROOT_BASE"
 echo "Runtime URLs: ${ROOT_BASE}net8/ ${ROOT_BASE}net9/ ${ROOT_BASE}net10/"

@@ -67,6 +67,27 @@ publish/wwwroot/
 
 `.nojekyll` 是必需的，否则 GitHub Pages 会忽略以下划线开头的目录，包括 `_framework`。
 
+## Cloudflare Pages
+
+`.github/workflows/deploy-cloudflare.yml` 会在每次推送到 `main` 时自动部署到 Cloudflare Pages。
+
+首次运行前：
+
+1. 在 Cloudflare 创建空的 Pages 项目，例如 `csharp-roslyn-wasm-playground`。
+2. 在 GitHub 仓库添加 Secrets：
+   - `CLOUDFLARE_API_TOKEN`：权限包含 `Account → Cloudflare Pages → Edit`。
+   - `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
+3. 如果项目名不同，可添加仓库变量 `CLOUDFLARE_PROJECT_NAME`。
+
+工作流会：
+
+1. 使用 `scripts/publish-all.sh "/" "publish/site"` 构建三个运行时版本；
+2. 删除 `.br` / `.gz`、PDB、source map 和未使用的 Bootstrap 文件，避免 Cloudflare 直接上传的文件数量限制；
+3. 写入 `_headers`，对 `_framework` 使用长期不可变缓存，对入口页面使用重新验证；
+4. 通过 Wrangler 上传 `publish/site`。
+
+Cloudflare 会自动压缩响应，因此不需要 Blazor 生成的 `.br` / `.gz` 文件。
+
 ## Nginx
 
 可参考 [`deploy/nginx.conf.example`](../deploy/nginx.conf.example)。关键配置：
