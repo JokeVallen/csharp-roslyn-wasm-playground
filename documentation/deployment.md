@@ -8,7 +8,7 @@ For the real .NET 8 / .NET 9 / .NET 10 multi-runtime layout, see [Runtime versio
 
 ## Requirements
 
-- .NET 9 SDK
+- .NET 8, .NET 9, and .NET 10 SDKs for the multi-runtime build
 - A static host or web server such as GitHub Pages, Nginx, IIS, or a CDN with SPA rewrites
 
 ## Local development

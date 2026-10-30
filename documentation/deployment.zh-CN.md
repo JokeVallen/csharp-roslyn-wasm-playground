@@ -8,7 +8,7 @@
 
 ## 环境要求
 
-- .NET 9 SDK
+- 多运行时构建需要 .NET 8、.NET 9 和 .NET 10 SDK
 - 静态托管或 Web 服务器，例如 GitHub Pages、Nginx、IIS，或支持 SPA 重写的 CDN
 
 ## 本地开发
