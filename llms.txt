@@ -22,6 +22,8 @@
 
 ## Notes
 
-- No HTTP compile/run API. Validate examples with Playwright if needed.
+- No HTTP compile/run API. Validate examples with Playwright or the iframe postMessage API.
+- `?code=base64url` prefills code; `readonly=1` disables editing.
+- `postMessage` supports `csharp-playground:run` / `csharp-playground:result`.
 - Use `completion=manual` and `loading="lazy"` for blog embeds.
 - Use `domcontentloaded` rather than `networkidle` when automating.

@@ -50,6 +50,9 @@ async function handleMessage(event) {
                 payload.code,
                 payload.targetFramework);
         }
+        else if (command === 'warmup') {
+            result = true;
+        }
         else if (command === 'format') {
             result = assemblyExports.RoslynWorker.Format(payload.code);
         }

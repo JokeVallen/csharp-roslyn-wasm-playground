@@ -80,10 +80,19 @@ typeof(MetadataReference).IsAssignableFrom(p.PropertyType)
 - 语义补全默认在停止输入 420ms 后自动触发；切换 `completion=manual` 或使用 `⚙ 设置` 面板后，可通过 `Ctrl + Space` 或 `✨ 提示` 按钮触发。
 - 语义请求发送到 `worker.js`，在独立的 .NET WebAssembly 运行时中调用导出的 `RoslynWorker.GetCompletions`。
 - Roslyn 编译、语义补全和用户代码执行全部运行在 Worker 中；主线程只负责编辑器事件、控制台输出、输入提示和 UI 动效。
+- 按 `Enter` 时，新行会继承当前行缩进，并在 `{`、`(`、`[` 后自动增加一级缩进。
+- 在只有空白的行输入 `}` 时，会自动减少一级缩进。
+- 粘贴多行代码时，会按当前行缩进自动整理。
+- 开启 `回车后格式化` 后，按 `Enter` 会使用 Roslyn 格式化整段代码（默认关闭）。
 - 使用 `↑` / `↓` 选择，`Escape` 关闭提示。
 - 提示框打开时，`Enter` 或 `Tab` 接受当前建议；提示框关闭时，`Tab` 插入 4 个空格，`Shift + Tab` 对当前行或选区减少缩进。
-- `Ctrl + Shift + F` 或 `🧹 格式化` 按钮会调用 Worker 中的 Roslyn `NormalizeWhitespace()` 格式化代码。
-- `⚙ 设置` 面板包含编译目标、自动语义补全和接纳补全后格式化选项。
+- 本地代码片段补全包含 `for`、`foreach`、`if`、`while`、`do`、`switch`、`try`，弹窗中显示左右布局的多行预览；插入多行片段时会继承当前行缩进。可通过条目右侧 `<` / `>` 折叠或展开，拖动中间分隔条调整菜单宽度，拖动最右侧边缘调整预览宽度。
+- `Ctrl + Shift + F` 会调用 Worker 中的 Roslyn `NormalizeWhitespace()` 格式化代码。
+- `⚙ 设置` 面板包含编译目标、补全/格式化开关、Enter/反缩进/粘贴缩进开关、代码片段与预览开关、可配置的本地提示/语义补全/格式化延迟、快捷键录制、空闲预加载，以及手动 `✨ 提示` / `🧹 格式化` 操作。
+- 点击设置弹层外部或按 `Escape` 可关闭设置。
+- 运行、格式化、语义提示和清空控制台快捷键可在设置面板中录制；默认分别为 `Ctrl + Enter`、`Ctrl + Shift + F`、`Ctrl + Space`、`Ctrl + K`。
+- `?code=base64url` 可预填代码，`readonly=1` 可禁止编辑。
+- 可信父页面可以通过仅浏览器内可用的 `postMessage` API（`csharp-playground:run` / `csharp-playground:result`）运行代码。
 - 顶部工具栏可直接切换深色/浅色/跟随系统主题和强调色，无需刷新。
 - 编译执行期间，运行按钮会显示等待动画。
 

@@ -68,6 +68,15 @@
             request('compile', { code, targetFramework }),
         format: (code) =>
             request('format', { code }),
+        warmup: () => new Promise((resolve) => {
+            const run = () => request('warmup', {}).then(resolve, () => resolve(false));
+            if ('requestIdleCallback' in window) {
+                window.requestIdleCallback(run, { timeout: 5000 });
+            }
+            else {
+                setTimeout(run, 1500);
+            }
+        }),
         execute: (assemblyBase64, inputsJson) =>
             request('execute', { assemblyBase64, inputsJson }),
         terminate

@@ -45,6 +45,40 @@ Rules:
 
 See [Iframe style API](iframe-style-api.md) for all URL parameters.
 
+## Prefill code with `?code=`
+
+Encode UTF-8 source as base64url, then pass it as `code`:
+
+```text
+https://csharp-roslyn-wasm-playground.pages.dev/?code=BASE64URL&theme=light&chrome=minimal
+```
+
+Add `readonly=1` for a non-editable example. This is suitable for short examples; keep URLs within practical browser limits.
+
+## Run from a parent page with `postMessage`
+
+The iframe exposes a browser-only automation API:
+
+```javascript
+iframe.contentWindow.postMessage({
+  type: 'csharp-playground:run',
+  requestId: 'req-1',
+  code: 'Console.WriteLine("hello");'
+}, 'https://csharp-roslyn-wasm-playground.pages.dev');
+```
+
+Response:
+
+```javascript
+{
+  type: 'csharp-playground:result',
+  requestId: 'req-1',
+  output: 'hello\n'
+}
+```
+
+Failures return `{ type, requestId, error }`. Only use this with trusted embedders. `Console.ReadLine()` is not supported by this runner.
+
 ## Agent prompt template
 
 ```text
@@ -94,12 +128,23 @@ Selectors:
 
 Do not use `networkidle`; the .NET runtime downloads many assets. Use `domcontentloaded` and wait for `#code-editor`.
 
+## Local smoke test
+
+The repository includes `scripts/smoke-test.js`:
+
+```bash
+npm install playwright
+node scripts/smoke-test.js http://127.0.0.1:5158/
+```
+
+It checks page load, compilation, `postMessage` execution, and snippet completion.
+
 ## Current limitations
 
-- No `?code=` prefill parameter.
-- No `postMessage` run/result protocol.
 - No headless HTTP compile/run API.
-- `Console.ReadLine()` requires interactive UI input.
+- `postMessage` still requires a real browser page and Web Worker.
+- `Console.ReadLine()` requires interactive UI input and is not supported by the `postMessage` runner.
+- URL-prefilled code is limited by practical URL length; keep examples short.
 - First load downloads a large runtime and can take 10–30 seconds on a cold cache.
 
 ## Related

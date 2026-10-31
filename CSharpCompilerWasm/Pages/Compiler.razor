@@ -41,6 +41,50 @@
             "Add", "Contains", "TryParse", "Round", "Substring", "ToUpper",
             "ToLower", "Trim", "Split", "Replace", "StartsWith", "EndsWith"
         ];
+        const snippets = [
+            {
+                label: "for",
+                detail: "for 循环",
+                insertText: "for (int i = 0; i < length; i++)\n{\n    \n}",
+                selectText: "length"
+            },
+            {
+                label: "foreach",
+                detail: "foreach 遍历",
+                insertText: "foreach (var item in items)\n{\n    \n}",
+                selectText: "items"
+            },
+            {
+                label: "if",
+                detail: "if 条件",
+                insertText: "if (condition)\n{\n    \n}",
+                selectText: "condition"
+            },
+            {
+                label: "while",
+                detail: "while 循环",
+                insertText: "while (condition)\n{\n    \n}",
+                selectText: "condition"
+            },
+            {
+                label: "do",
+                detail: "do-while 循环",
+                insertText: "do\n{\n    \n} while (condition);",
+                selectText: "condition"
+            },
+            {
+                label: "switch",
+                detail: "switch 分支",
+                insertText: "switch (value)\n{\n    case 1:\n        break;\n    default:\n        break;\n}",
+                selectText: "value"
+            },
+            {
+                label: "try",
+                detail: "try-catch",
+                insertText: "try\n{\n    \n}\ncatch (Exception ex)\n{\n    Console.WriteLine(ex.Message);\n}",
+                selectText: "Exception"
+            }
+        ];
 
         let textarea = null;
         let menu = null;
@@ -49,6 +93,16 @@
         let suppressUntil = 0;
         let localTimer = null;
         let acceptedByUser = false;
+        let enterPending = false;
+        let previewCollapsed = false;
+        let listWidth = 360;
+        let previewWidth = 280;
+        let localDelayMs = 120;
+        let autoIndentOnEnter = true;
+        let dedentOnCloseBrace = true;
+        let autoIndentOnPaste = true;
+        let snippetsEnabled = true;
+        let snippetPreviewEnabled = true;
 
         function updateLocal() {
             if (Date.now() < suppressUntil) {
@@ -58,7 +112,7 @@
 
             const before = textarea ? textarea.value.slice(0, textarea.selectionStart) : "";
             if (/\.\s*$/.test(before)) {
-                matches = members.slice(0, 8);
+                matches = localSuggestions("", true).slice(0, 8);
                 active = 0;
                 render();
                 return;
@@ -70,9 +124,7 @@
                 return;
             }
 
-            matches = words
-                .filter(word => word.toLowerCase().startsWith(value.toLowerCase()))
-                .slice(0, 8);
+            matches = localSuggestions(value, false).slice(0, 8);
             active = matches.length > 0 ? 0 : -1;
             render();
         }
@@ -90,6 +142,48 @@
             const before = textarea.value.slice(0, textarea.selectionStart);
             const match = before.match(/[\p{L}_][\p{L}\p{N}_]*$/u);
             return match ? match[0] : "";
+        }
+
+        function normalizeItem(item) {
+            if (typeof item === "string") {
+                return { label: item, insertText: item };
+            }
+            return {
+                label: item.label || item.insertText || "",
+                insertText: item.insertText || item.label || "",
+                detail: item.detail || "",
+                selectText: item.selectText || ""
+            };
+        }
+
+        function dedupe(items) {
+            const seen = new Set();
+            return items.filter((item) => {
+                const key = item.label.toLowerCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+        }
+
+        function localSuggestions(value, memberContext) {
+            if (memberContext) {
+                return members.map(normalizeItem);
+            }
+
+            if (!value) return [];
+
+            const lower = value.toLowerCase();
+            const snippetItems = snippetsEnabled
+                ? snippets
+                    .filter(item => item.label.toLowerCase().startsWith(lower))
+                    .map(normalizeItem)
+                : [];
+            const keywordItems = words
+                .filter(word => word.toLowerCase().startsWith(lower))
+                .map(normalizeItem);
+
+            return dedupe([...snippetItems, ...keywordItems]);
         }
 
         function applyMenuTheme() {
@@ -117,7 +211,9 @@
             );
             menu.style.left = (rect.left + 14) + "px";
             menu.style.top = Math.max(rect.top + 8, top) + "px";
-            menu.style.width = Math.min(rect.width - 28, 360) + "px";
+            const hasPreview = !!menu.querySelector(".code-completion-preview");
+            const desiredWidth = listWidth + (hasPreview ? previewWidth + 5 : 0);
+            menu.style.width = Math.max(240, Math.min(rect.width - 28, desiredWidth)) + "px";
         }
 
         function ensureActiveVisible() {
@@ -133,15 +229,120 @@
             }
         }
 
+        function startResize(kind, event) {
+            event.preventDefault();
+            const startX = event.clientX;
+            const startWidth = kind === "list" ? listWidth : previewWidth;
+
+            const move = (moveEvent) => {
+                const nextWidth = Math.max(
+                    kind === "list" ? 220 : 160,
+                    Math.min(kind === "list" ? 720 : 520, startWidth + moveEvent.clientX - startX));
+
+                if (kind === "list") {
+                    listWidth = nextWidth;
+                    const list = menu.querySelector(".code-completion-list");
+                    if (list) list.style.width = listWidth + "px";
+                }
+                else {
+                    previewWidth = nextWidth;
+                    const preview = menu.querySelector(".code-completion-preview");
+                    if (preview) preview.style.width = previewWidth + "px";
+                }
+
+                positionMenu();
+            };
+            const up = () => {
+                document.removeEventListener("mousemove", move);
+                document.removeEventListener("mouseup", up);
+            };
+
+            document.addEventListener("mousemove", move);
+            document.addEventListener("mouseup", up);
+        }
+
         function render() {
             menu.innerHTML = "";
-            matches.forEach((word, index) => {
+
+            const body = document.createElement("div");
+            body.className = "code-completion-body";
+
+            const list = document.createElement("div");
+            list.className = "code-completion-list";
+            list.style.width = listWidth + "px";
+
+            matches.forEach((entry, index) => {
                 const item = document.createElement("div");
                 item.className = "code-completion-item" + (index === active ? " active" : "");
                 item.dataset.index = index;
-                item.textContent = word;
-                menu.appendChild(item);
+
+                const text = document.createElement("div");
+                text.className = "code-completion-text";
+
+                const label = document.createElement("span");
+                label.className = "code-completion-label";
+                label.textContent = entry.label;
+                text.appendChild(label);
+
+                if (entry.detail) {
+                    const detail = document.createElement("span");
+                    detail.className = "code-completion-detail";
+                    detail.textContent = entry.detail;
+                    text.appendChild(detail);
+                }
+
+                item.appendChild(text);
+
+                if (snippetPreviewEnabled && entry.insertText?.includes("\n")) {
+                    const fold = document.createElement("button");
+                    fold.type = "button";
+                    fold.className = "code-completion-fold";
+                    fold.title = previewCollapsed ? "展开预览" : "折叠预览";
+                    fold.textContent = previewCollapsed ? ">" : "<";
+                    fold.addEventListener("mousedown", (foldEvent) => {
+                        foldEvent.preventDefault();
+                        foldEvent.stopPropagation();
+                        previewCollapsed = !previewCollapsed;
+                        render();
+                    });
+                    item.appendChild(fold);
+                }
+
+                list.appendChild(item);
             });
+
+            body.appendChild(list);
+
+            const activeEntry = matches[active];
+            if (snippetPreviewEnabled && activeEntry?.insertText?.includes("\n") && !previewCollapsed) {
+                const resizer = document.createElement("div");
+                resizer.className = "code-completion-resizer";
+                resizer.title = "拖动调整菜单宽度";
+                resizer.addEventListener("mousedown", (event) => startResize("list", event));
+                body.appendChild(resizer);
+
+                const preview = document.createElement("pre");
+                preview.className = "code-completion-preview";
+                preview.style.width = previewWidth + "px";
+                preview.textContent = activeEntry.insertText;
+                body.appendChild(preview);
+
+                const previewResizer = document.createElement("div");
+                previewResizer.className = "code-completion-resizer-right";
+                previewResizer.title = "拖动调整预览宽度";
+                previewResizer.addEventListener("mousedown", (event) => startResize("preview", event));
+                body.appendChild(previewResizer);
+            }
+            else {
+                const rightResizer = document.createElement("div");
+                rightResizer.className = "code-completion-resizer-right";
+                rightResizer.title = "拖动调整菜单宽度";
+                rightResizer.addEventListener("mousedown", (event) => startResize("list", event));
+                body.appendChild(rightResizer);
+            }
+
+            menu.appendChild(body);
+
             positionMenu();
             menu.classList.toggle("is-visible", matches.length > 0);
             ensureActiveVisible();
@@ -154,11 +355,63 @@
                 return;
             }
 
-            matches = words
-                .filter(word => word.toLowerCase().startsWith(value.toLowerCase()))
-                .slice(0, 8);
+            matches = localSuggestions(value, false).slice(0, 8);
             active = matches.length > 0 ? 0 : -1;
             render();
+        }
+
+        function insertNewLine() {
+            if (!textarea) return;
+
+            const value = textarea.value;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const before = value.slice(0, start);
+            const lineStart = before.lastIndexOf("\n") + 1;
+            const currentLine = before.slice(lineStart);
+            const leading = (currentLine.match(/^[ \t]*/) || [""])[0];
+            const trimmed = currentLine.trimEnd();
+            let indent = leading;
+
+            if (/[{([]\s*$/.test(trimmed)) {
+                indent += "    ";
+            }
+
+            enterPending = true;
+            textarea.setRangeText("\n" + indent, start, end, "end");
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            textarea.focus();
+        }
+
+        function handlePaste(event) {
+            if (!textarea || textarea.readOnly || !autoIndentOnPaste) return;
+
+            const pasted = event.clipboardData?.getData("text/plain") ?? "";
+            if (!pasted.includes("\n")) return;
+
+            event.preventDefault();
+
+            const value = textarea.value;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const before = value.slice(0, start);
+            const lineStart = before.lastIndexOf("\n") + 1;
+            const currentLine = before.slice(lineStart);
+            const baseIndent = (currentLine.match(/^[ \t]*/) || [""])[0];
+            const lines = pasted.replace(/\r\n?/g, "\n").split("\n");
+            const indents = lines
+                .filter(line => line.trim().length > 0)
+                .map(line => (line.match(/^[ \t]*/) || [""])[0].length);
+            const commonIndent = indents.length > 0 ? Math.min(...indents) : 0;
+
+            const adjusted = lines.map((line, index) => {
+                const stripped = line.slice(Math.min(commonIndent, line.length));
+                return index === 0 ? stripped : baseIndent + stripped;
+            }).join("\n");
+
+            textarea.setRangeText(adjusted, start, end, "end");
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            textarea.focus();
         }
 
         function insertIndent(outdent) {
@@ -198,9 +451,31 @@
 
             const value = prefix();
             const start = textarea.selectionStart - value.length;
-            textarea.value = textarea.value.slice(0, start) + matches[index] + textarea.value.slice(textarea.selectionStart);
-            const position = start + matches[index].length;
-            textarea.setSelectionRange(position, position);
+            const entry = matches[index];
+            const beforeSelection = textarea.selectionStart;
+            const textareaValue = textarea.value;
+            const lineStart = textareaValue.lastIndexOf("\n", start - 1) + 1;
+            const linePrefix = textareaValue.slice(lineStart, start);
+            const baseIndent = (linePrefix.match(/^[ \t]*/) || [""])[0];
+            const insertion = (entry.insertText || entry.label)
+                .replace(/\r\n?/g, "\n")
+                .split("\n")
+                .map((line, lineIndex) => lineIndex === 0 || !line ? line : baseIndent + line)
+                .join("\n");
+
+            textarea.setRangeText(insertion, start, beforeSelection, "end");
+
+            if (entry.selectText) {
+                const selectStart = start + insertion.indexOf(entry.selectText);
+                if (selectStart >= start) {
+                    textarea.setSelectionRange(selectStart, selectStart + entry.selectText.length);
+                }
+            }
+            else {
+                const position = start + insertion.length;
+                textarea.setSelectionRange(position, position);
+            }
+
             acceptedByUser = true;
             textarea.dispatchEvent(new Event("input", { bubbles: true }));
             textarea.focus();
@@ -225,14 +500,48 @@
             textarea.addEventListener("input", () => {
                 hide();
                 clearTimeout(localTimer);
-                localTimer = setTimeout(updateLocal, 120);
+                localTimer = setTimeout(updateLocal, localDelayMs);
             });
+            textarea.addEventListener("paste", handlePaste);
             document.addEventListener("mousedown", (event) => {
                 if (event.target !== textarea && !menu.contains(event.target)) {
                     hide();
                 }
             });
             textarea.addEventListener("keydown", (event) => {
+                if (dedentOnCloseBrace && event.key === "}" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                    const value = textarea.value;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+                    const beforeLine = value.slice(lineStart, start);
+
+                    if (start === end && /^[ \t]+$/.test(beforeLine)) {
+                        event.preventDefault();
+                        const remove = Math.min(4, beforeLine.length);
+                        const indentation = beforeLine.slice(0, beforeLine.length - remove);
+                        textarea.setRangeText(indentation + "}", lineStart, start, "end");
+                        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+                        textarea.focus();
+                        return;
+                    }
+                }
+
+                if (event.key === "Enter" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                    if (menu.classList.contains("is-visible") && active >= 0) {
+                        event.preventDefault();
+                        apply(active);
+                    }
+                    else {
+                        enterPending = true;
+                        if (autoIndentOnEnter) {
+                            event.preventDefault();
+                            insertNewLine();
+                        }
+                    }
+                    return;
+                }
+
                 if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
                     event.preventDefault();
                     if (menu.classList.contains("is-visible") && active >= 0) {
@@ -272,12 +581,24 @@
             });
         }
 
+        document.addEventListener("click", (event) => {
+            const settings = document.querySelector(".editor-settings");
+            if (settings?.open && !settings.contains(event.target)) {
+                settings.open = false;
+            }
+        });
+        document.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") return;
+            const settings = document.querySelector(".editor-settings");
+            if (settings?.open) {
+                settings.open = false;
+            }
+        });
+
         function localKeywordSuggestions() {
             const value = prefix();
             if (!value) return [];
-            return words
-                .filter(word => word.toLowerCase().startsWith(value.toLowerCase()))
-                .slice(0, 8);
+            return localSuggestions(value, false).slice(0, 8);
         }
 
         function show(items) {
@@ -288,7 +609,7 @@
             else if (typeof items === "string") {
                 items = [items];
             }
-            const semantic = Array.isArray(items) ? items.slice(0, 12) : [];
+            const semantic = Array.isArray(items) ? items.map(normalizeItem).slice(0, 12) : [];
             // Never let an empty/unexpected semantic response erase the local
             // keyword menu that is already visible.
             if (semantic.length === 0) {
@@ -301,7 +622,7 @@
                 ? semantic
                 : [...localKeywordSuggestions(), ...semantic];
 
-            matches = Array.from(new Set(merged)).slice(0, 12);
+            matches = dedupe(merged).slice(0, 12);
             active = 0;
             render();
         }
@@ -311,14 +632,162 @@
             return element ? element.selectionStart : 0;
         }
 
+        function getCharBeforeCaret(elementId) {
+            const element = document.getElementById(elementId);
+            if (!element || element.selectionStart < 1) return "";
+            return element.value.charAt(element.selectionStart - 1);
+        }
+
+        function setSelectionStart(elementId, position) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            const safePosition = Math.max(0, Math.min(position, element.value.length));
+            element.focus();
+            element.setSelectionRange(safePosition, safePosition);
+        }
+
+        function configure(options) {
+            if (!options) return;
+            if (Number.isFinite(options.localDelayMs)) {
+                localDelayMs = Math.max(0, Math.min(2000, options.localDelayMs));
+            }
+            if (typeof options.autoIndentOnEnter === "boolean") {
+                autoIndentOnEnter = options.autoIndentOnEnter;
+            }
+            if (typeof options.dedentOnCloseBrace === "boolean") {
+                dedentOnCloseBrace = options.dedentOnCloseBrace;
+            }
+            if (typeof options.autoIndentOnPaste === "boolean") {
+                autoIndentOnPaste = options.autoIndentOnPaste;
+            }
+            if (typeof options.snippetsEnabled === "boolean") {
+                snippetsEnabled = options.snippetsEnabled;
+            }
+            if (typeof options.snippetPreviewEnabled === "boolean") {
+                snippetPreviewEnabled = options.snippetPreviewEnabled;
+            }
+        }
+
         function consumeAccepted() {
             const value = acceptedByUser;
             acceptedByUser = false;
             return value;
         }
 
-        return { attach, show, hide, getSelectionStart, consumeAccepted };
+        function consumeEnter() {
+            const value = enterPending;
+            enterPending = false;
+            return value;
+        }
+
+        return { attach, show, hide, getSelectionStart, getCharBeforeCaret, setSelectionStart, configure, consumeAccepted, consumeEnter };
     })();
+
+    window.playgroundShortcuts = (() => {
+        let pendingResolve = null;
+
+        function formatCombo(event) {
+            if (["Control", "Shift", "Alt", "Meta"].includes(event.key)) {
+                return null;
+            }
+
+            const parts = [];
+            if (event.ctrlKey) parts.push("Ctrl");
+            if (event.shiftKey) parts.push("Shift");
+            if (event.altKey) parts.push("Alt");
+            parts.push(event.key === " " ? "Space" : event.key.length === 1 ? event.key.toUpperCase() : event.key);
+            return parts.join("+");
+        }
+
+        document.addEventListener("keydown", (event) => {
+            if (!pendingResolve) return;
+            const combo = formatCombo(event);
+            if (!combo) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            const resolve = pendingResolve;
+            pendingResolve = null;
+            resolve(combo);
+        }, true);
+
+        const storageKey = "csharp-playground:shortcuts";
+
+        return {
+            captureNext: () => new Promise(resolve => {
+                pendingResolve = resolve;
+            }),
+            load: () => {
+                try {
+                    return localStorage.getItem(storageKey) || "{}";
+                }
+                catch {
+                    return "{}";
+                }
+            },
+            save: (value) => {
+                try {
+                    localStorage.setItem(storageKey, typeof value === "string" ? value : JSON.stringify(value));
+                }
+                catch {
+                    // Storage may be disabled.
+                }
+            }
+        };
+    })();
+
+    window.playgroundHost = {
+        run: async (code) => {
+            const textarea = document.getElementById("code-editor");
+            const button = document.querySelector(".compile-btn");
+            if (!textarea || !button) {
+                throw new Error("Playground editor is not ready.");
+            }
+            if (textarea.readOnly) {
+                throw new Error("Playground is read-only.");
+            }
+
+            textarea.value = String(code ?? "");
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            await new Promise(resolve => setTimeout(resolve, 80));
+
+            button.click();
+            const started = Date.now();
+            await new Promise(resolve => setTimeout(resolve, 80));
+            while (button.disabled && Date.now() - started < 120000) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            return document.getElementById("output")?.textContent || "";
+        }
+    };
+
+    window.addEventListener("message", async (event) => {
+        const data = event.data;
+        if (!data || data.type !== "csharp-playground:run") {
+            return;
+        }
+
+        const requestId = data.requestId ?? "";
+        const targetOrigin = event.origin && event.origin !== "null" ? event.origin : "*";
+
+        try {
+            const output = await window.playgroundHost.run(data.code);
+            event.source?.postMessage({
+                type: "csharp-playground:result",
+                requestId,
+                output
+            }, targetOrigin);
+        }
+        catch (error) {
+            event.source?.postMessage({
+                type: "csharp-playground:result",
+                requestId,
+                error: error?.message || String(error)
+            }, targetOrigin);
+        }
+    });
 
     window.promptForInput = async (newOutputText) => {
         return new Promise((resolve) => {
@@ -472,22 +941,91 @@
                             <input type="checkbox" checked="@formatAfterCompletion" @onchange="OnFormatAfterCompletionChanged" />
                             <span>接纳补全后格式化</span>
                         </label>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@formatAfterEnter" @onchange="OnFormatAfterEnterChanged" />
+                            <span>回车后格式化</span>
+                        </label>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@formatOnSemicolon" @onchange="OnFormatOnSemicolonChanged" />
+                            <span>输入 ; 后格式化</span>
+                        </label>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@formatOnBrace" @onchange="OnFormatOnBraceChanged" />
+                            <span>输入 } 后格式化</span>
+                        </label>
+                        <div class="settings-section-title">缩进行为</div>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@autoIndentOnEnter" @onchange="OnAutoIndentOnEnterChanged" />
+                            <span>Enter 自动缩进</span>
+                        </label>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@dedentOnCloseBrace" @onchange="OnDedentOnCloseBraceChanged" />
+                            <span>输入 } 自动反缩进</span>
+                        </label>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@autoIndentOnPaste" @onchange="OnAutoIndentOnPasteChanged" />
+                            <span>粘贴多行自动缩进</span>
+                        </label>
+                        <div class="settings-section-title">代码片段</div>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@snippetsEnabled" @onchange="OnSnippetsEnabledChanged" />
+                            <span>启用代码片段</span>
+                        </label>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@snippetPreviewEnabled" @onchange="OnSnippetPreviewEnabledChanged" />
+                            <span>显示片段预览</span>
+                        </label>
+                        <label class="settings-row settings-check">
+                            <input type="checkbox" checked="@prewarmCompiler" @onchange="OnPrewarmChanged" />
+                            <span>空闲时预加载编译器</span>
+                        </label>
+                        <label class="settings-row" title="输入后显示本地提示的延迟">
+                            <span>本地提示延迟</span>
+                            <input type="number" min="0" max="2000" step="20" value="@localDelayMs" @onchange="OnLocalDelayChanged" />
+                        </label>
+                        <label class="settings-row" title="自动语义补全延迟">
+                            <span>语义补全延迟</span>
+                            <input type="number" min="100" max="2000" step="20" value="@semanticDelayMs" @onchange="OnSemanticDelayChanged" />
+                        </label>
+                        <label class="settings-row" title="尾末符号触发格式化的延迟">
+                            <span>格式化延迟</span>
+                            <input type="number" min="50" max="2000" step="20" value="@formatDelayMs" @onchange="OnFormatDelayChanged" />
+                        </label>
+                        <div class="settings-section-title">快捷键（点击录制）</div>
+                        <label class="settings-row">
+                            <span>运行</span>
+                            <button type="button" class="shortcut-button" @onclick="CaptureRunShortcut">@runShortcut</button>
+                        </label>
+                        <label class="settings-row">
+                            <span>格式化</span>
+                            <button type="button" class="shortcut-button" @onclick="CaptureFormatShortcut">@formatShortcut</button>
+                        </label>
+                        <label class="settings-row">
+                            <span>语义提示</span>
+                            <button type="button" class="shortcut-button" @onclick="CaptureCompletionShortcut">@completionShortcut</button>
+                        </label>
+                        <label class="settings-row">
+                            <span>清空控制台</span>
+                            <button type="button" class="shortcut-button" @onclick="CaptureClearShortcut">@clearShortcut</button>
+                        </label>
+                        <div class="settings-actions">
+                            <button class="btn btn-outline-secondary btn-sm @(isSemanticBusy ? "is-busy" : "")"
+                                    @onclick="ShowSemanticCompletionsAsync"
+                                    title="语义补全"
+                                    aria-label="请求语义代码补全"
+                                    disabled="@isSemanticBusy">
+                                <span aria-hidden="true">✨</span> @(isSemanticBusy ? "分析中…" : "提示")
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    @onclick="FormatCodeAsync"
+                                    title="格式化代码"
+                                    aria-label="格式化 C# 代码"
+                                    disabled="@isFormatting">
+                                <span aria-hidden="true">🧹</span> @(isFormatting ? "格式化中…" : "格式化")
+                            </button>
+                        </div>
                     </div>
                 </details>
-                <button class="btn btn-outline-secondary btn-sm @(isSemanticBusy ? "is-busy" : "")"
-                        @onclick="ShowSemanticCompletionsAsync"
-                        title="语义补全 (Ctrl+Space)"
-                        aria-label="请求语义代码补全"
-                        disabled="@isSemanticBusy">
-                    <span aria-hidden="true">✨</span> @(isSemanticBusy ? "分析中…" : "提示")
-                </button>
-                <button class="btn btn-outline-secondary btn-sm"
-                        @onclick="FormatCodeAsync"
-                        title="格式化代码 (Ctrl+Shift+F)"
-                        aria-label="格式化 C# 代码"
-                        disabled="@isFormatting">
-                    <span aria-hidden="true">🧹</span> @(isFormatting ? "格式化中…" : "格式化")
-                </button>
                 <button class="btn btn-outline-secondary btn-sm" 
                         @onclick="LoadSampleCode" 
                         @onkeydown="@(async (e) => await HandleKeyDown(e, LoadSampleCode))"
@@ -537,6 +1075,7 @@
                       class="code-editor" 
                       placeholder="Write your C# code here..."
                       spellcheck="false"
+                      readonly="@readonlyMode"
                       aria-label="C# code editor"
                       aria-describedby="editor-instructions"
                       role="textbox"
@@ -1085,6 +1624,23 @@ public class Program
     private bool isSemanticBusy;
     private bool isFormatting;
     private bool formatAfterCompletion;
+    private bool formatAfterEnter;
+    private bool formatOnSemicolon;
+    private bool formatOnBrace;
+    private bool autoIndentOnEnter = true;
+    private bool dedentOnCloseBrace = true;
+    private bool autoIndentOnPaste = true;
+    private bool snippetsEnabled = true;
+    private bool snippetPreviewEnabled = true;
+    private bool prewarmCompiler = true;
+    private bool readonlyMode;
+    private int semanticDelayMs = 420;
+    private int localDelayMs = 120;
+    private int formatDelayMs = 250;
+    private string runShortcut = "Ctrl+Enter";
+    private string formatShortcut = "Ctrl+Shift+F";
+    private string completionShortcut = "Ctrl+Space";
+    private string clearShortcut = "Ctrl+K";
     private static readonly string[] CompletionModeOptions = { "auto", "manual" };
     private bool AutoSemanticCompletion => completionMode == "auto";
 
@@ -1120,6 +1676,13 @@ public class Program
         if (firstRender)
         {
             await JSRuntime.InvokeVoidAsync("playgroundCompletion.attach", "code-editor", "code-completion");
+            await ConfigureCompletionAsync();
+            await LoadShortcutsAsync();
+            StateHasChanged();
+            if (prewarmCompiler)
+            {
+                _ = PrewarmCompilerAsync();
+            }
         }
     }
 
@@ -1457,6 +2020,7 @@ public class Program
         chrome = NormalizeOption(GetQueryParameter("chrome"), "full", "full", "minimal", "none");
         density = NormalizeOption(GetQueryParameter("density"), "comfortable", "comfortable", "compact");
         completionMode = NormalizeOption(GetQueryParameter("completion"), "auto", "auto", "manual");
+        prewarmCompiler = AutoSemanticCompletion;
         targetFramework = NormalizeTargetFramework(GetQueryParameter("target"));
         if (!SupportedTargetFrameworks.Contains(targetFramework))
         {
@@ -1477,6 +2041,38 @@ public class Program
         if (double.TryParse(GetQueryParameter("fontsize"), out var fontSize))
         {
             editorFontSize = Math.Clamp(fontSize, 11, 22);
+        }
+    }
+
+    private void ApplyCodeParameter()
+    {
+        var readonlyValue = GetQueryParameter("readonly");
+        readonlyMode = readonlyValue is "1" || string.Equals(readonlyValue, "true", StringComparison.OrdinalIgnoreCase);
+
+        var encoded = GetQueryParameter("code");
+        if (string.IsNullOrWhiteSpace(encoded))
+        {
+            return;
+        }
+
+        try
+        {
+            var normalized = encoded.Replace('-', '+').Replace('_', '/');
+            normalized = normalized.PadRight((normalized.Length + 3) / 4 * 4, '=');
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(normalized));
+            if (string.IsNullOrWhiteSpace(decoded))
+            {
+                return;
+            }
+
+            sourceCode = decoded;
+            displayCode = decoded;
+            showFullCode = decoded.Contains("class ", StringComparison.Ordinal) ||
+                           decoded.Contains("using ", StringComparison.Ordinal);
+        }
+        catch
+        {
+            // Ignore malformed ?code= values and keep the default sample.
         }
     }
 
@@ -1585,6 +2181,94 @@ public class Program
         formatAfterCompletion = e.Value as bool? ?? false;
     }
 
+    private void OnFormatOnSemicolonChanged(ChangeEventArgs e)
+    {
+        formatOnSemicolon = e.Value as bool? ?? false;
+    }
+
+    private void OnFormatAfterEnterChanged(ChangeEventArgs e)
+    {
+        formatAfterEnter = e.Value as bool? ?? false;
+    }
+
+    private async Task OnAutoIndentOnEnterChanged(ChangeEventArgs e)
+    {
+        autoIndentOnEnter = e.Value as bool? ?? true;
+        await ConfigureCompletionAsync();
+    }
+
+    private async Task OnDedentOnCloseBraceChanged(ChangeEventArgs e)
+    {
+        dedentOnCloseBrace = e.Value as bool? ?? true;
+        await ConfigureCompletionAsync();
+    }
+
+    private async Task OnAutoIndentOnPasteChanged(ChangeEventArgs e)
+    {
+        autoIndentOnPaste = e.Value as bool? ?? true;
+        await ConfigureCompletionAsync();
+    }
+
+    private async Task OnSnippetsEnabledChanged(ChangeEventArgs e)
+    {
+        snippetsEnabled = e.Value as bool? ?? true;
+        await ConfigureCompletionAsync();
+    }
+
+    private async Task OnSnippetPreviewEnabledChanged(ChangeEventArgs e)
+    {
+        snippetPreviewEnabled = e.Value as bool? ?? true;
+        await ConfigureCompletionAsync();
+    }
+
+    private async Task ConfigureCompletionAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("playgroundCompletion.configure", new
+        {
+            localDelayMs,
+            autoIndentOnEnter,
+            dedentOnCloseBrace,
+            autoIndentOnPaste,
+            snippetsEnabled,
+            snippetPreviewEnabled
+        });
+    }
+
+    private void OnFormatOnBraceChanged(ChangeEventArgs e)
+    {
+        formatOnBrace = e.Value as bool? ?? false;
+    }
+
+    private void OnPrewarmChanged(ChangeEventArgs e)
+    {
+        prewarmCompiler = e.Value as bool? ?? false;
+    }
+
+    private void OnSemanticDelayChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            semanticDelayMs = Math.Clamp(value, 100, 2000);
+        }
+    }
+
+    private async Task OnLocalDelayChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            localDelayMs = Math.Clamp(value, 0, 2000);
+            await ConfigureCompletionAsync();
+        }
+    }
+
+    private void OnFormatDelayChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            formatDelayMs = Math.Clamp(value, 50, 2000);
+        }
+    }
+
     private static string GetCompletionModeLabel(string value)
     {
         return value == "manual" ? "手动" : "自动";
@@ -1609,6 +2293,18 @@ public class Program
         AddOutput($"Compilation target changed to {targetFramework}.", "info");
     }
 
+    private async Task PrewarmCompilerAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeAsync<bool>("roslynWorker.warmup");
+        }
+        catch
+        {
+            // Warmup is best-effort; Run/completion will start the worker if needed.
+        }
+    }
+
     private async Task FormatCodeAsync()
     {
         if (isFormatting)
@@ -1620,8 +2316,11 @@ public class Program
         isFormatting = true;
         StateHasChanged();
 
+        var caret = 0;
         try
         {
+            caret = await JSRuntime.InvokeAsync<int>("playgroundCompletion.getSelectionStart", "code-editor");
+
             if (!showFullCode)
             {
                 OnCodeChanged(new ChangeEventArgs { Value = displayCode });
@@ -1632,6 +2331,11 @@ public class Program
             {
                 sourceCode = formatted.TrimEnd();
                 UpdateDisplayCode();
+                await Task.Delay(20);
+                await JSRuntime.InvokeVoidAsync(
+                    "playgroundCompletion.setSelectionStart",
+                    "code-editor",
+                    Math.Min(caret, displayCode.Length));
             }
         }
         catch (Exception ex)
@@ -1660,9 +2364,11 @@ public class Program
     private async Task OnCodeInputAsync()
     {
         var accepted = false;
+        var entered = false;
         try
         {
             accepted = await JSRuntime.InvokeAsync<bool>("playgroundCompletion.consumeAccepted");
+            entered = await JSRuntime.InvokeAsync<bool>("playgroundCompletion.consumeEnter");
         }
         catch
         {
@@ -1673,6 +2379,27 @@ public class Program
         {
             await FormatCodeAsync();
             return;
+        }
+
+        if (!accepted && entered && formatAfterEnter)
+        {
+            await Task.Delay(formatDelayMs);
+            await FormatCodeAsync();
+            return;
+        }
+
+        if (!accepted && (formatOnSemicolon || formatOnBrace))
+        {
+            var typed = await JSRuntime.InvokeAsync<string>(
+                "playgroundCompletion.getCharBeforeCaret",
+                "code-editor");
+
+            if ((formatOnSemicolon && typed == ";") || (formatOnBrace && typed == "}"))
+            {
+                await Task.Delay(formatDelayMs);
+                await FormatCodeAsync();
+                return;
+            }
         }
 
         if (!AutoSemanticCompletion)
@@ -1686,7 +2413,7 @@ public class Program
 
         try
         {
-            await Task.Delay(420, cts.Token);
+            await Task.Delay(semanticDelayMs, cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -1938,6 +2665,7 @@ public class Program
     protected override void OnInitialized()
     {
         ApplyStyleParameters();
+        ApplyCodeParameter();
 
         // Set welcome message based on system output toggle
         if (showSystemOutput)
@@ -2032,29 +2760,125 @@ public class Program
 
     private async Task HandleEditorKeyDown(KeyboardEventArgs e)
     {
-        // Ctrl+Enter to compile and run
-        if (e.CtrlKey && e.ShiftKey && e.Key == "f")
+        if (MatchesShortcut(e, formatShortcut))
         {
             await FormatCodeAsync();
         }
-        else if (e.CtrlKey && e.Key == "Enter")
+        else if (MatchesShortcut(e, runShortcut))
         {
             await CompileAndRun();
         }
-        // Ctrl+L to load sample code
-        else if (e.CtrlKey && e.Key == "l")
-        {
-            LoadSampleCode();
-        }
-        // Ctrl+K to clear output
-        // Ctrl+Space to request semantic completion
-        else if (e.CtrlKey && e.Key == " ")
+        else if (MatchesShortcut(e, completionShortcut))
         {
             await ShowSemanticCompletionsAsync();
         }
-        else if (e.CtrlKey && e.Key == "k")
+        else if (MatchesShortcut(e, clearShortcut))
         {
             ClearOutput();
+        }
+    }
+
+    private static bool MatchesShortcut(KeyboardEventArgs e, string shortcut)
+    {
+        if (string.IsNullOrWhiteSpace(shortcut))
+        {
+            return false;
+        }
+
+        var parts = shortcut
+            .Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            return false;
+        }
+
+        var ctrl = parts.Contains("Ctrl", StringComparer.OrdinalIgnoreCase);
+        var shift = parts.Contains("Shift", StringComparer.OrdinalIgnoreCase);
+        var alt = parts.Contains("Alt", StringComparer.OrdinalIgnoreCase);
+        var key = parts[^1];
+        var eventKey = e.Key == " " ? "Space" : e.Key;
+
+        return e.CtrlKey == ctrl &&
+               e.ShiftKey == shift &&
+               e.AltKey == alt &&
+               string.Equals(eventKey, key, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task CaptureRunShortcut()
+    {
+        runShortcut = await CaptureShortcutAsync(runShortcut);
+        await SaveShortcutsAsync();
+    }
+
+    private async Task CaptureFormatShortcut()
+    {
+        formatShortcut = await CaptureShortcutAsync(formatShortcut);
+        await SaveShortcutsAsync();
+    }
+
+    private async Task CaptureCompletionShortcut()
+    {
+        completionShortcut = await CaptureShortcutAsync(completionShortcut);
+        await SaveShortcutsAsync();
+    }
+
+    private async Task CaptureClearShortcut()
+    {
+        clearShortcut = await CaptureShortcutAsync(clearShortcut);
+        await SaveShortcutsAsync();
+    }
+
+    private async Task<string> CaptureShortcutAsync(string current)
+    {
+        try
+        {
+            var captured = await JSRuntime.InvokeAsync<string>("playgroundShortcuts.captureNext");
+            return string.IsNullOrWhiteSpace(captured) ? current : captured;
+        }
+        catch
+        {
+            return current;
+        }
+    }
+
+    private async Task LoadShortcutsAsync()
+    {
+        try
+        {
+            var json = await JSRuntime.InvokeAsync<string>("playgroundShortcuts.load");
+            var preferences = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            if (preferences is null)
+            {
+                return;
+            }
+
+            if (preferences.TryGetValue("run", out var run) && !string.IsNullOrWhiteSpace(run)) runShortcut = run;
+            if (preferences.TryGetValue("format", out var format) && !string.IsNullOrWhiteSpace(format)) formatShortcut = format;
+            if (preferences.TryGetValue("completion", out var completion) && !string.IsNullOrWhiteSpace(completion)) completionShortcut = completion;
+            if (preferences.TryGetValue("clear", out var clear) && !string.IsNullOrWhiteSpace(clear)) clearShortcut = clear;
+        }
+        catch
+        {
+            // Keep defaults when storage is unavailable.
+        }
+    }
+
+    private async Task SaveShortcutsAsync()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(new
+            {
+                run = runShortcut,
+                format = formatShortcut,
+                completion = completionShortcut,
+                clear = clearShortcut
+            });
+            await JSRuntime.InvokeVoidAsync("playgroundShortcuts.save", json);
+        }
+        catch
+        {
+            // Storing preferences is best-effort.
         }
     }
 

@@ -33,6 +33,10 @@ The playground header also provides live theme and accent selectors. They change
 | `density` | enum | `comfortable`, `compact` | `comfortable` | Reduces padding, gaps, and button sizes. |
 | `radius` | number | `0`–`32` | `16` | Card corner radius in CSS pixels. Values are clamped. |
 | `fontsize` | number | `11`–`22` | `14` | Editor font size in CSS pixels. Values are clamped. |
+| `completion` | enum | `auto`, `manual` | `auto` | Automatic semantic completion or manual trigger only. |
+| `target` | enum | `net8.0`, `net9.0`, `net10.0` | runtime default | Compile against the selected reference assemblies. |
+| `code` | string | base64url-encoded C# source | none | Prefills the editor. Keep examples short. |
+| `readonly` | bool | `1`, `true` | off | Makes the editor read-only. |
 
 ### Accent palette
 

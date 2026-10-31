@@ -51,6 +51,50 @@ Supported URL parameters:
 | `fontsize` | `11`–`22` | `14` |
 | `completion` | `auto`, `manual` | `auto` |
 | `target` | `net8.0`, `net9.0`, `net10.0` | build default |
+| `code` | base64url-encoded C# source | none |
+| `readonly` | `1` / `true` | off |
+
+## Prefill code from a URL
+
+```text
+https://csharp-roslyn-wasm-playground.pages.dev/?code=BASE64URL&theme=light&chrome=minimal
+```
+
+Encode UTF-8 source as base64url (replace `+` with `-`, `/` with `_`, remove `=` padding). Add `readonly=1` for a non-editable example.
+
+## postMessage API
+
+The iframe exposes a browser-only API; there is still no HTTP compile endpoint.
+
+Parent page to iframe:
+
+```javascript
+iframe.contentWindow.postMessage({
+  type: 'csharp-playground:run',
+  requestId: 'req-1',
+  code: 'Console.WriteLine("hello");'
+}, 'https://csharp-roslyn-wasm-playground.pages.dev');
+```
+
+Iframe response:
+
+```javascript
+{
+  type: 'csharp-playground:result',
+  requestId: 'req-1',
+  output: 'hello\n'
+}
+```
+
+Errors return `{ type, requestId, error }`. This API is intended for trusted embedders. `Console.ReadLine()` is not supported by the postMessage runner.
+
+## Editor features
+
+- Local snippet completion for `for`, `foreach`, `if`, `while`, `do`, `switch`, and `try`, with a collapsible and resizable preview pane; inserted multiline snippets inherit the current line indentation.
+- `Tab` accepts a suggestion when the menu is open; otherwise it indents. `Enter` auto-indents and adds one level after `{`, `(`, or `[`; typing `}` dedents; multiline paste is re-indented relative to the current line.
+- `Ctrl + Shift + F` formats code.
+- Settings can configure local/semantic/format delays, format triggers, shortcut recording, and idle worker prewarm.
+- Click outside the settings popover or press `Escape` to close it.
 
 ## Browser automation
 
@@ -91,8 +135,9 @@ Important:
 ## Limitations
 
 - No headless HTTP compile/run API.
-- No `?code=` prefill parameter yet.
-- No `postMessage` run/result API yet.
+- `postMessage` still requires a real browser page and Web Worker.
+- `Console.ReadLine()` is interactive and not supported by the postMessage runner.
+- URL-prefilled code is limited by practical URL length; keep examples short.
 - User code runs entirely in the browser in a Web Worker sandbox.
 - Do not put secrets or private data into generated examples.
 

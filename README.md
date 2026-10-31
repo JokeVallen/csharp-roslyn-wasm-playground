@@ -15,7 +15,8 @@ This repository is an extended fork of [MicrosoftLearning/c-sharp-minor](https:/
 
 - **Real C# compilation in the browser**: Roslyn compiles user code directly in WebAssembly; no server-side execution.
 - **Interactive console**: Supports `Console.Write`, `Console.WriteLine`, and `Console.ReadLine()` through JS interop.
-- **Learning-friendly editor**: Toggle between simplified method-body mode and full class view, with automatic/manual semantic completion, conditional Tab completion/indentation, and Roslyn-based formatting.
+- **Learning-friendly editor**: Toggle between simplified method-body mode and full class view, with automatic/manual semantic completion, snippet previews, conditional Tab completion/indentation, and Roslyn-based formatting.
+- **AI/blog integration**: `?code=base64url` prefill, `readonly=1`, and a browser-only `postMessage` run/result API for trusted embedders.
 - **Live appearance controls**: Switch dark/light/system theme and accent color directly in the toolbar at runtime.
 - **Run feedback**: Animated waiting state on the Run button while compilation/execution is in progress.
 - **Sample code and diagnostics**: Built-in sample, real Roslyn diagnostics, optional system output.

@@ -80,10 +80,19 @@ so the published `_framework` output keeps standard `.dll` files available for i
 - Semantic completion is automatic by default after 420 ms of idle typing; switch `completion=manual` or use the `⚙ 设置` panel to require `Ctrl + Space` / the `✨ 提示` button.
 - The semantic request is sent to `worker.js`, which boots the same .NET WebAssembly runtime and calls the exported `RoslynWorker.GetCompletions` method.
 - The main thread stays responsive because Roslyn compilation, semantic completion, and user-code execution all run in the worker. The main thread only handles editor events, console output, input prompts, and UI animation.
+- `Enter` auto-indents the new line from the current line's leading whitespace and adds one level after `{`, `(`, or `[`.
+- Typing `}` on a whitespace-only line removes one indentation level.
+- Pasting multiline text re-indents it relative to the current line.
+- The `回车后格式化` setting formats the whole code with Roslyn after `Enter` (off by default).
 - `ArrowUp` / `ArrowDown` move through suggestions and `Escape` closes the popup.
 - When the popup is open, `Enter` or `Tab` accepts the selected suggestion. When the popup is closed, `Tab` inserts four spaces and `Shift + Tab` outdents the current line or selection.
-- `Ctrl + Shift + F` or the `🧹 格式化` button formats the current code with Roslyn `NormalizeWhitespace()` inside the worker.
-- The `⚙ 设置` panel contains the compile target, automatic semantic completion, and format-after-completion options.
+- Local snippet completion for `for`, `foreach`, `if`, `while`, `do`, `switch`, and `try` shows a side-by-side multiline preview in the popup. Inserted multiline snippets inherit the current line's indentation. Use the item `<` / `>` button to collapse or expand the preview; drag the separator to resize the menu and the right edge to resize the preview.
+- `Ctrl + Shift + F` formats the current code with Roslyn `NormalizeWhitespace()` inside the worker.
+- The `⚙ 设置` panel contains the compile target, completion/format toggles, Enter/dedent/paste indentation toggles, code-snippet and preview toggles, configurable local/semantic/format delays, shortcut recording, idle worker prewarm, and the manual `✨ 提示` / `🧹 格式化` actions.
+- Click outside the settings popover or press `Escape` to close it.
+- Run, format, completion, and clear-console shortcuts can be recorded in the settings panel; defaults are `Ctrl + Enter`, `Ctrl + Shift + F`, `Ctrl + Space`, and `Ctrl + K`.
+- `?code=base64url` prefills code and `readonly=1` disables editing.
+- Trusted parent pages can run code through the browser-only `postMessage` API (`csharp-playground:run` / `csharp-playground:result`).
 - The header toolbar can switch dark/light/system theme and accent color without reloading.
 - The Run button shows an animated waiting state while compilation and execution are in progress.
 

@@ -45,6 +45,40 @@
 
 完整参数见 [iframe 样式 API](iframe-style-api.zh-CN.md)。
 
+## 使用 `?code=` 预填代码
+
+将 UTF-8 源码编码为 base64url，然后作为 `code` 参数：
+
+```text
+https://csharp-roslyn-wasm-playground.pages.dev/?code=BASE64URL&theme=light&chrome=minimal
+```
+
+添加 `readonly=1` 可生成只读示例。适合较短代码，注意浏览器 URL 长度限制。
+
+## 父页面通过 `postMessage` 运行代码
+
+iframe 提供仅浏览器内可用的自动化 API：
+
+```javascript
+iframe.contentWindow.postMessage({
+  type: 'csharp-playground:run',
+  requestId: 'req-1',
+  code: 'Console.WriteLine("hello");'
+}, 'https://csharp-roslyn-wasm-playground.pages.dev');
+```
+
+返回：
+
+```javascript
+{
+  type: 'csharp-playground:result',
+  requestId: 'req-1',
+  output: 'hello\n'
+}
+```
+
+失败时返回 `{ type, requestId, error }`。仅建议在可信的父页面中使用。该运行器不支持 `Console.ReadLine()`。
+
 ## 给 AI 的提示词模板
 
 ```text
@@ -94,12 +128,23 @@ await browser.close();
 
 不要使用 `networkidle`；.NET 运行时会下载大量资源。应使用 `domcontentloaded` 并等待 `#code-editor`。
 
+## 本地冒烟测试
+
+仓库包含 `scripts/smoke-test.js`：
+
+```bash
+npm install playwright
+node scripts/smoke-test.js http://127.0.0.1:5158/
+```
+
+会检查页面加载、代码编译、`postMessage` 执行和代码片段补全。
+
 ## 当前限制
 
-- 没有 `?code=` 预填参数。
-- 没有 `postMessage` 运行/结果协议。
 - 没有服务端无头编译/运行 API。
-- `Console.ReadLine()` 需要读者在 UI 中输入。
+- `postMessage` 仍需要真实浏览器页面和 Web Worker。
+- `Console.ReadLine()` 需要读者在 UI 中输入，`postMessage` 运行器不支持。
+- URL 预填代码受浏览器 URL 长度限制，建议保持示例简短。
 - 首次冷加载会下载较大的运行时，可能需要 10–30 秒。
 
 ## 相关文档
