@@ -84,8 +84,9 @@ publish/wwwroot/
 
 1. 使用 `scripts/publish-all.sh "/" "publish/site"` 构建三个运行时版本；
 2. 删除 `.br` / `.gz`、PDB、source map 和未使用的 Bootstrap 文件，避免 Cloudflare 直接上传的文件数量限制；
-3. 写入 `_headers`，对 `_framework` 使用长期不可变缓存，对入口页面使用重新验证；
-4. 通过 Wrangler 上传 `publish/site`。
+3. 写入 `_headers`，对带指纹资源使用长期缓存，对无哈希的 `blazor.webassembly.js` / `dotnet.js` 启动文件使用 `no-cache`；
+4. 给无哈希启动文件 URL 加上应用版本查询参数，避免部署后浏览器/CDN 旧缓存继续引用已删除的哈希 DLL；
+5. 通过 Wrangler 上传 `publish/site`。
 
 Cloudflare 会自动压缩响应，因此不需要 Blazor 生成的 `.br` / `.gz` 文件。
 

@@ -14,6 +14,8 @@ set -euo pipefail
 
 ROOT_BASE="${1:-/csharp-playground/}"
 OUT_DIR="${2:-publish/site}"
+APP_VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' CSharpCompilerWasm/CSharpCompilerWasm.csproj | head -n 1)"
+APP_VERSION="${APP_VERSION:-$(date +%Y%m%d%H%M%S)}"
 
 case "$ROOT_BASE" in
   */) ;;
@@ -32,6 +34,8 @@ build_runtime() {
   rm -rf "$work"
   dotnet publish ./CSharpCompilerWasm/CSharpCompilerWasm.csproj -c Release -f "$tfm" -o "$work"
   sed -i "s|<base href=\"[^\"]*\" />|<base href=\"${base}\" />|" "$work/wwwroot/index.html"
+  sed -i "s|_framework/blazor\.webassembly\.js|_framework/blazor.webassembly.js?v=${APP_VERSION}|" "$work/wwwroot/index.html"
+  sed -i "s|import(\"\./dotnet\.js\")|import(\"./dotnet.js?v=${APP_VERSION}\")|" "$work/wwwroot/_framework/blazor.webassembly.js"
   mkdir -p "$OUT_DIR/$dir"
   cp -r "$work/wwwroot/." "$OUT_DIR/$dir/"
 }
@@ -53,10 +57,26 @@ if [ -d "$OUT_DIR/lib/bootstrap" ]; then
   find "$OUT_DIR/lib/bootstrap" -type f ! -name 'bootstrap.min.css' -delete
 fi
 
-cat > "$OUT_DIR/_headers" <<'EOF'
-/_framework/*
+{
+  for prefix in /_framework /net8/_framework /net9/_framework /net10/_framework; do
+    cat <<EOF
+$prefix/blazor.webassembly.js
+  Cache-Control: no-cache
+$prefix/dotnet.js
+  Cache-Control: no-cache
+$prefix/*.js
+  Cache-Control: public, max-age=3600
+$prefix/*.dll
   Cache-Control: public, max-age=31536000, immutable
+$prefix/*.wasm
+  Cache-Control: public, max-age=31536000, immutable
+$prefix/*.dat
+  Cache-Control: public, max-age=31536000, immutable
+$prefix/*.json
+  Cache-Control: no-cache
 EOF
+  done
+} > "$OUT_DIR/_headers"
 
 echo "Published multi-runtime site to $OUT_DIR"
 echo "Root base href: $ROOT_BASE"

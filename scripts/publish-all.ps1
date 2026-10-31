@@ -5,6 +5,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$projectXml = [xml](Get-Content "CSharpCompilerWasm/CSharpCompilerWasm.csproj" -Raw)
+$appVersion = @($projectXml.Project.PropertyGroup.Version | Where-Object { $_ }) | Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($appVersion)) {
+    $appVersion = Get-Date -Format "yyyyMMddHHmmss"
+}
+
 if (-not $RootBaseHref.EndsWith("/")) {
     $RootBaseHref += "/"
 }
@@ -32,7 +38,15 @@ function Publish-Runtime {
     $indexHtml = Join-Path $work "wwwroot/index.html"
     $content = Get-Content $indexHtml -Raw
     $content = $content -replace '<base href="[^"]*" />', "<base href=`"$baseHref`" />"
+    $content = $content -replace '_framework/blazor\.webassembly\.js', "_framework/blazor.webassembly.js?v=$appVersion"
     Set-Content -Path $indexHtml -Value $content -NoNewline
+
+    $blazorJs = Join-Path $work "wwwroot/_framework/blazor.webassembly.js"
+    if (Test-Path $blazorJs) {
+        $blazorContent = Get-Content $blazorJs -Raw
+        $blazorContent = $blazorContent -replace 'import\("\./dotnet\.js"\)', "import(`"./dotnet.js?v=$appVersion`")"
+        Set-Content -Path $blazorJs -Value $blazorContent -NoNewline
+    }
 
     $destination = Join-Path $OutputDir $Directory
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
@@ -65,10 +79,25 @@ if (Test-Path $bootstrapDir) {
         Remove-Item -Force
 }
 
-$headers = @"
-/_framework/*
+$headerBlocks = foreach ($prefix in @("/_framework", "/net8/_framework", "/net9/_framework", "/net10/_framework")) {
+@"
+$prefix/blazor.webassembly.js
+  Cache-Control: no-cache
+$prefix/dotnet.js
+  Cache-Control: no-cache
+$prefix/*.js
+  Cache-Control: public, max-age=3600
+$prefix/*.dll
   Cache-Control: public, max-age=31536000, immutable
+$prefix/*.wasm
+  Cache-Control: public, max-age=31536000, immutable
+$prefix/*.dat
+  Cache-Control: public, max-age=31536000, immutable
+$prefix/*.json
+  Cache-Control: no-cache
 "@
+}
+$headers = $headerBlocks -join "`n"
 [System.IO.File]::WriteAllText((Join-Path $OutputDir "_headers"), $headers, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host "Published multi-runtime site to $OutputDir"

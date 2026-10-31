@@ -29,30 +29,8 @@ jobs:
 
       - name: Publish runtime builds
         run: |
-          set -euo pipefail
-          rm -rf publish/site
-          mkdir -p publish/site
-
-          build_runtime() {
-            tfm="$1"
-            dir="$2"
-            base="$3"
-            dotnet publish ./CSharpCompilerWasm/CSharpCompilerWasm.csproj -c Release -f "$tfm" -o "publish/$dir"
-            sed -i "s|<base href=\"/\" />|<base href=\"$base\" />|" "publish/$dir/wwwroot/index.html"
-            mkdir -p "publish/site/$dir"
-            cp -r "publish/$dir/wwwroot/." "publish/site/$dir/"
-          }
-
-          build_runtime net8.0 net8 "/csharp-roslyn-wasm-playground/net8/"
-          build_runtime net9.0 net9 "/csharp-roslyn-wasm-playground/net9/"
-          build_runtime net10.0 net10 "/csharp-roslyn-wasm-playground/net10/"
-
-          # Default entry is .NET 10 at the site root.
-          cp -r publish/net10/wwwroot/. publish/site/
-          sed -i 's|<base href="/csharp-roslyn-wasm-playground/net10/" />|<base href="/csharp-roslyn-wasm-playground/" />|' publish/site/index.html
-          touch publish/site/.nojekyll
-
-
+          chmod +x scripts/publish-all.sh
+          ./scripts/publish-all.sh "/csharp-roslyn-wasm-playground/" "publish/site"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
