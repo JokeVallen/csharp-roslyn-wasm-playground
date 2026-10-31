@@ -55,6 +55,23 @@ async function main() {
             failures.push('snippet completion menu did not open');
         }
 
+        const compactPage = await browser.newPage({ viewport: { width: 640, height: 360 } });
+        await compactPage.goto(`${baseUrl}?chrome=minimal&layout=stacked`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 120000
+        });
+        await compactPage.locator('#code-editor').waitFor({ timeout: 120000 });
+        await compactPage.locator('.editor-settings summary').click();
+        await compactPage.waitForTimeout(250);
+        const settingsPanelFits = await compactPage.locator('.settings-panel').evaluate(element => {
+            const rect = element.getBoundingClientRect();
+            return rect.top >= 0 && rect.bottom <= window.innerHeight + 1;
+        });
+        if (!settingsPanelFits) {
+            failures.push('settings panel overflows a compact iframe viewport');
+        }
+        await compactPage.close();
+
         if (failures.length > 0) {
             console.error('SMOKE TEST FAILED');
             for (const failure of failures) console.error(`- ${failure}`);

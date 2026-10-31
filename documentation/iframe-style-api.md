@@ -22,6 +22,8 @@ Parameter names are case-insensitive. Unknown values fall back to the documented
 
 The playground header also provides live theme and accent selectors. They change the current page only; URL parameters remain the recommended way to set the initial style for an iframe.
 
+The `⚙ 设置` popover repositions itself inside the iframe viewport and scrolls internally, so compact embeds do not clip its lower controls.
+
 ## Parameters
 
 | Parameter | Type | Allowed values | Default | Effect |

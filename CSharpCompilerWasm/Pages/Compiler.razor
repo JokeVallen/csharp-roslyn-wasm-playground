@@ -497,6 +497,40 @@
             menu.setAttribute("aria-label", "代码提示");
             document.body.appendChild(menu);
 
+            const settingsDetails = document.querySelector(".editor-settings");
+            const positionSettingsPanel = () => {
+                if (!settingsDetails?.open) return;
+                const summary = settingsDetails.querySelector("summary");
+                const panel = settingsDetails.querySelector(".settings-panel");
+                if (!summary || !panel) return;
+
+                const rect = summary.getBoundingClientRect();
+                const margin = 8;
+                const spaceBelow = window.innerHeight - rect.bottom - margin * 2;
+                const spaceAbove = rect.top - margin * 2;
+                const openUp = spaceBelow < 240 && spaceAbove > spaceBelow;
+
+                panel.style.position = "fixed";
+                panel.style.boxSizing = "border-box";
+                panel.style.right = Math.max(margin, window.innerWidth - rect.right) + "px";
+                panel.style.width = Math.min(320, window.innerWidth - margin * 2) + "px";
+                panel.style.maxHeight = Math.max(120, Math.min(680, (openUp ? spaceAbove : spaceBelow) - 24)) + "px";
+                if (openUp) {
+                    panel.style.top = "auto";
+                    panel.style.bottom = (window.innerHeight - rect.top + margin) + "px";
+                }
+                else {
+                    panel.style.bottom = "auto";
+                    panel.style.top = (rect.bottom + margin) + "px";
+                }
+            };
+
+            if (settingsDetails) {
+                settingsDetails.addEventListener("toggle", () => requestAnimationFrame(positionSettingsPanel));
+                window.addEventListener("resize", positionSettingsPanel);
+                window.addEventListener("scroll", positionSettingsPanel, true);
+            }
+
             textarea.addEventListener("input", () => {
                 hide();
                 clearTimeout(localTimer);
